@@ -1,0 +1,4 @@
+# Deny access to PHP files
+<FilesMatch "\.php$">
+    Deny from all
+</FilesMatch>

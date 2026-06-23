@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@layer base {
+  body {
+    @apply font-body bg-neo-white text-black;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold uppercase tracking-tight;
+  }
+
+  h1 { @apply text-4xl; }
+  h2 { @apply text-3xl; }
+  h3 { @apply text-2xl; }
+  h4 { @apply text-xl; }
+}
+
+@layer components {
+  .neo-card {
+    @apply bg-white border-4 border-black shadow-neo p-4;
+  }
+
+  .neo-card-yellow {
+    @apply bg-neo-yellow border-4 border-black shadow-neo p-4;
+  }
+
+  .neo-card-cyan {
+    @apply bg-neo-cyan border-4 border-black shadow-neo p-4 text-white;
+  }
+
+  .neo-card-orange {
+    @apply bg-neo-orange border-4 border-black shadow-neo p-4 text-white;
+  }
+
+  .neo-card-green {
+    @apply bg-neo-green border-4 border-black shadow-neo p-4;
+  }
+
+  .neo-btn {
+    @apply font-heading font-bold uppercase text-sm px-6 py-3 border-4 border-black shadow-neo 
+           transition-all duration-75 cursor-pointer inline-flex items-center justify-center gap-2;
+  }
+
+  .neo-btn:hover {
+    @apply translate-x-[2px] translate-y-[2px] shadow-[2px_2px_0px_0px_#000];
+  }
+
+  .neo-btn:active {
+    @apply translate-x-[4px] translate-y-[4px] shadow-none;
+  }
+
+  .neo-btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .neo-btn:disabled:hover {
+    @apply translate-x-0 translate-y-0 shadow-neo;
+  }
+
+  .neo-btn-yellow {
+    @apply neo-btn bg-neo-yellow text-black;
+  }
+
+  .neo-btn-cyan {
+    @apply neo-btn bg-neo-cyan text-white;
+  }
+
+  .neo-btn-orange {
+    @apply neo-btn bg-neo-orange text-white;
+  }
+
+  .neo-btn-green {
+    @apply neo-btn bg-neo-green text-black;
+  }
+
+  .neo-btn-red {
+    @apply neo-btn bg-neo-red text-white;
+  }
+
+  .neo-btn-white {
+    @apply neo-btn bg-white text-black;
+  }
+
+  .neo-input {
+    @apply w-full px-4 py-3 border-4 border-black bg-white font-body font-bold text-sm;
+  }
+
+  .neo-input:focus {
+    @apply outline-none shadow-neo bg-neo-yellow;
+  }
+
+  .neo-select {
+    @apply neo-input appearance-none cursor-pointer;
+  }
+
+  .neo-badge {
+    @apply inline-block px-3 py-1 border-2 border-black font-heading font-bold text-xs uppercase;
+  }
+
+  .neo-badge-red {
+    @apply neo-badge bg-neo-red text-white;
+  }
+
+  .neo-badge-green {
+    @apply neo-badge bg-neo-green text-black;
+  }
+
+  .neo-badge-yellow {
+    @apply neo-badge bg-neo-yellow text-black;
+  }
+
+  .neo-divider {
+    @apply border-t-4 border-black my-4;
+  }
+
+  .neo-table {
+    @apply w-full border-collapse border-4 border-black;
+  }
+
+  .neo-table th {
+    @apply bg-black text-white font-heading font-bold uppercase text-sm px-4 py-3 border-2 border-black;
+  }
+
+  .neo-table td {
+    @apply px-4 py-3 border-2 border-black font-body text-sm;
+  }
+
+  .neo-table tr:nth-child(even) td {
+    @apply bg-neo-yellow bg-opacity-20;
+  }
+}
