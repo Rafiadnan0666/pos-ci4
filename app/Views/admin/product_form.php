@@ -1,3 +1,9 @@
+<?php
+/**
+ * @var object|null $product
+ * @var object[] $categories
+ */
+?>
 <?= $this->extend('layout/main') ?>
 <?= $this->section('content') ?>
 <div class="max-w-3xl mx-auto px-4 py-8">
@@ -64,13 +70,30 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-bold text-sm mb-1">Size</label>
+                        <input type="text" name="size" class="neo-input" placeholder="e.g. L, 42, One Size" value="<?= esc(old('size', $product->size ?? '')) ?>" />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">Color</label>
+                        <input type="text" name="color" class="neo-input" placeholder="e.g. Red, Blue" value="<?= esc(old('color', $product->color ?? '')) ?>" />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">Material</label>
+                        <input type="text" name="material" class="neo-input" placeholder="e.g. Cotton, Nylon" value="<?= esc(old('material', $product->material ?? '')) ?>" />
+                    </div>
+                </div>
+
                 <div>
                     <label class="block font-bold text-sm mb-1">Product Image</label>
-                    <input type="file" name="image_file" class="neo-input !p-2" accept="image/jpeg,image/png,image/webp,image/gif" />
+                    <input type="file" name="image_file" id="image_file" class="neo-input !p-2" accept="image/jpeg,image/png,image/webp,image/gif" />
                     <p class="text-xs opacity-60 mt-1">Accepted: JPG, PNG, WebP, GIF — Max 2MB</p>
+                    <div id="image_preview" class="mt-2 <?= ($product && $product->image) ? '' : 'hidden' ?>">
+                        <img id="preview_img" src="<?= ($product && $product->image) ? base_url($product->image) : '' ?>" class="w-32 h-32 border-4 border-black object-cover" alt="Preview" />
+                    </div>
                     <?php if ($product && $product->image): ?>
                     <div class="mt-2 flex items-center gap-3">
-                        <img src="<?= base_url($product->image) ?>" class="w-16 h-16 border-4 border-black object-cover" alt="" />
                         <span class="text-xs font-bold">Current image</span>
                         <label class="text-xs flex items-center gap-1">
                             <input type="checkbox" name="remove_image" value="1" /> Remove
@@ -114,5 +137,23 @@ document.querySelector('[name="new_category"]')?.addEventListener('input', funct
         newCat.disabled = true;
     }
 })();
+
+// Image preview on file select
+document.getElementById('image_file')?.addEventListener('change', function(e) {
+    const preview = document.getElementById('image_preview');
+    const img = document.getElementById('preview_img');
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            img.src = ev.target.result;
+            preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.classList.add('hidden');
+        img.src = '';
+    }
+});
 </script>
 <?= $this->endSection() ?>

@@ -40,6 +40,12 @@
                 <p><span class="font-bold">Address:</span> <?= $order->shipping_address ?></p>
                 <p><span class="font-bold">Courier:</span> <?= $order->courier_name ?> - <?= $order->courier_service ?></p>
                 <p><span class="font-bold">Shipping Cost:</span> Rp <?= number_format($order->shipping_cost, 0, ',', '.') ?></p>
+                <?php if (!empty($order->tracking_number)): ?>
+                <p><span class="font-bold">Tracking:</span> <?= esc($order->tracking_number) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($order->tracking_url)): ?>
+                <p><a href="<?= esc($order->tracking_url) ?>" target="_blank" class="neo-btn-cyan text-xs !px-2 !py-1 mt-1 inline-block">🔗 Track Shipment</a></p>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>

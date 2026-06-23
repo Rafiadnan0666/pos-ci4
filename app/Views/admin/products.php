@@ -63,6 +63,9 @@
                             </div>
                             <div class="flex items-center gap-2 mt-2">
                                 <span class="text-xs opacity-60"><?= $p->weight_grams ?>g</span>
+                                <?php if (!empty($p->size)): ?><span class="text-xs opacity-60">📏 <?= esc($p->size) ?></span><?php endif; ?>
+                                <?php if (!empty($p->color)): ?><span class="text-xs opacity-60">🎨 <?= esc($p->color) ?></span><?php endif; ?>
+                                <?php if (!empty($p->material)): ?><span class="text-xs opacity-60">🧵 <?= esc($p->material) ?></span><?php endif; ?>
                                 <?php if ($p->image): ?>
                                 <span class="text-xs opacity-60">🖼️</span>
                                 <?php endif; ?>

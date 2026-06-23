@@ -16,6 +16,12 @@ class Biteship extends BaseConfig
 
     public string $originPostalCode = '10110';
 
+    public string $originAddress = 'Jl. Contoh No. 123, Jakarta Pusat';
+
+    public string $originContactName = 'Store Owner';
+
+    public string $originContactPhone = '02112345678';
+
     public function __construct()
     {
         parent::__construct();

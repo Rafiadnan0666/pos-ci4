@@ -155,7 +155,7 @@ class Midtrans
 
     public function getTransactionStatus(string $orderId): array
     {
-        $url = $this->config->getSnapUrl() . '/' . $orderId . '/status';
+        $url = $this->config->getApiUrl() . '/' . $orderId . '/status';
 
         $ch = curl_init();
 

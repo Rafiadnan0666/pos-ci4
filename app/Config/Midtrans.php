@@ -16,6 +16,10 @@ class Midtrans extends BaseConfig
 
     public string $snapUrlProduction = 'https://app.midtrans.com/snap/v1/transactions';
 
+    public string $apiUrlSandbox = 'https://api.sandbox.midtrans.com/v2';
+
+    public string $apiUrlProduction = 'https://api.midtrans.com/v2';
+
     public function __construct()
     {
         parent::__construct();
@@ -30,6 +34,13 @@ class Midtrans extends BaseConfig
         return $this->isProduction
             ? $this->snapUrlProduction
             : $this->snapUrlSandbox;
+    }
+
+    public function getApiUrl(): string
+    {
+        return $this->isProduction
+            ? $this->apiUrlProduction
+            : $this->apiUrlSandbox;
     }
 
     public function getNotificationUrl(): string

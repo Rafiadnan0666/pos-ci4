@@ -20,7 +20,7 @@
     <?php endif; ?>
 
     <div class="neo-card" data-aos="fade-up">
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <?= csrf_field() ?>
             <div class="space-y-4">
                 <div>
@@ -30,6 +30,24 @@
                 <div>
                     <label class="block font-bold text-sm mb-1">Email *</label>
                     <input type="email" name="email" class="neo-input" value="<?= esc(old('email', $user->email)) ?>" required />
+                </div>
+                <div>
+                    <label class="block font-bold text-sm mb-1">Phone</label>
+                    <input type="text" name="phone" class="neo-input" value="<?= esc(old('phone', $user->phone ?? '')) ?>" />
+                </div>
+                <div>
+                    <label class="block font-bold text-sm mb-1">Address</label>
+                    <textarea name="address" class="neo-input" rows="2"><?= esc(old('address', $user->address ?? '')) ?></textarea>
+                </div>
+                <div>
+                    <label class="block font-bold text-sm mb-1">Avatar</label>
+                    <input type="file" name="avatar" class="neo-input" accept="image/jpeg,image/png,image/webp" />
+                    <?php if (!empty($user->avatar)): ?>
+                    <div class="mt-2 flex items-center gap-3">
+                        <img src="<?= base_url($user->avatar) ?>" class="w-12 h-12 border-4 border-black object-cover" alt="" />
+                        <span class="text-xs font-bold">Current avatar</span>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <label class="block font-bold text-sm mb-1">Role *</label>

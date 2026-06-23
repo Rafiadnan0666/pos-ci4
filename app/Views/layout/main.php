@@ -123,7 +123,7 @@
                 <div><h4 style="color:#F97316;font-size:.875rem;margin-bottom:.75rem;text-transform:uppercase;font-weight:700;">CONTACT</h4>
                     <ul class="space-y-2 text-sm" style="color:#9CA3AF;">
                         <li>hello@outdoorgear.store</li>
-                        <li>+62 21 1234 5678</li>
+                        <li style="color:#black;"><a href="https://wa.me/6281295064928?message=bang Geli bang" target="_blank">+62 812-9506-4928</a></li>
                     </ul>
                 </div>
             </div>

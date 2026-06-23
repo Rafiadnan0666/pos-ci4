@@ -6,11 +6,13 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         <div class="neo-card" data-aos="fade-right">
-            <div class="bg-gray-100 border-4 border-black h-80 flex items-center justify-center text-8xl">
-                <?php
-                $catIcons = ['Tents' => '⛺', 'Packs' => '🎒', 'Apparel' => '🧥', 'Cooking' => '🍳'];
-                echo $catIcons[$product->category] ?? '📦';
-                ?>
+            <div class="bg-gray-100 border-4 border-black h-80 flex items-center justify-center text-8xl overflow-hidden">
+                <?php $catIcons = ['Tents' => '⛺', 'Packs' => '🎒', 'Apparel' => '🧥', 'Cooking' => '🍳']; ?>
+                <?php if ($product->image): ?>
+                <img src="<?= base_url($product->image) ?>" alt="<?= $product->name ?>" class="w-full h-full object-cover" />
+                <?php else: ?>
+                <?= $catIcons[$product->category] ?? '📦' ?>
+                <?php endif; ?>
             </div>
         </div>
         <div data-aos="fade-left">
@@ -19,8 +21,11 @@
             <p class="text-sm mt-2"><?= $product->description ?></p>
             <div class="neo-divider my-4"></div>
             <div class="text-4xl font-black mb-4">Rp <?= number_format($product->price, 0, ',', '.') ?></div>
-            <div class="flex items-center gap-4 text-sm mb-4">
+            <div class="flex flex-wrap items-center gap-4 text-sm mb-4">
                 <span class="font-bold">Weight: <?= $product->weight_grams ?> g</span>
+                <?php if (!empty($product->size)): ?><span class="font-bold">Size: <?= esc($product->size) ?></span><?php endif; ?>
+                <?php if (!empty($product->color)): ?><span class="font-bold">Color: <?= esc($product->color) ?></span><?php endif; ?>
+                <?php if (!empty($product->material)): ?><span class="font-bold">Material: <?= esc($product->material) ?></span><?php endif; ?>
                 <span class="neo-badge <?= $product->stock > 0 ? 'bg-neo-green' : 'bg-neo-red text-white' ?>">
                     <?= $product->stock > 0 ? 'In Stock: ' . $product->stock : 'Out of Stock' ?>
                 </span>
@@ -46,8 +51,12 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <?php foreach ($related as $r): ?>
             <a href="<?= base_url('product/' . $r->slug) ?>" class="neo-card hover:bg-neo-yellow transition-colors">
-                <div class="bg-gray-100 border-2 border-black h-24 flex items-center justify-center text-3xl mb-2">
+                <div class="bg-gray-100 border-2 border-black h-24 flex items-center justify-center text-3xl mb-2 overflow-hidden">
+                    <?php if ($r->image): ?>
+                    <img src="<?= base_url($r->image) ?>" alt="<?= $r->name ?>" class="w-full h-full object-cover" />
+                    <?php else: ?>
                     <?= $catIcons[$r->category] ?? '📦' ?>
+                    <?php endif; ?>
                 </div>
                 <h3 class="font-heading font-bold text-xs uppercase"><?= $r->name ?></h3>
                 <p class="font-bold text-sm mt-1">Rp <?= number_format($r->price, 0, ',', '.') ?></p>

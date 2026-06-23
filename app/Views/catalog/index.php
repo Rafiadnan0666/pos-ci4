@@ -41,12 +41,16 @@
             <div class="neo-card hover:bg-neo-yellow transition-colors flex flex-col" data-aos="zoom-in" data-aos-delay="<?= ($i % 4) * 50 ?>">
                 <div class="bg-gray-100 border-2 border-black h-36 flex items-center justify-center text-5xl mb-3">
                     <?php if ($p->image): ?>
-                    <img src="<?= base_url('images/' . $p->image) ?>" alt="<?= $p->name ?>" class="w-full h-full object-cover" />
+                    <img src="<?= base_url($p->image) ?>" alt="<?= $p->name ?>" class="w-full h-full object-cover" />
                     <?php else: ?>
                     <span><?= $catIcon ?></span>
                     <?php endif; ?>
                 </div>
                 <h3 class="font-heading font-bold text-sm uppercase leading-tight flex-1"><?= $p->name ?></h3>
+                <?php $attrs = array_filter([$p->size ?? '', $p->color ?? '', $p->material ?? '']); ?>
+                <?php if (!empty($attrs)): ?>
+                <p class="text-xs font-bold text-gray-500 mt-1"><?= implode(' | ', $attrs) ?></p>
+                <?php endif; ?>
                 <p class="text-xs text-gray-500 mt-1 line-clamp-2"><?= esc($p->description) ?></p>
                 <div class="flex items-center justify-between mt-3 pt-3 neo-divider">
                     <span class="font-black text-lg">Rp <?= number_format($p->price, 0, ',', '.') ?></span>

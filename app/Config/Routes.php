@@ -30,6 +30,8 @@ $routes->get('checkout', 'Checkout::index', ['filter' => 'auth:buyer']);
 $routes->get('shipping/getCities', 'ShippingController::getCities', ['filter' => 'auth:buyer']);
 $routes->post('shipping/getRates', 'ShippingController::getRates', ['filter' => 'auth:buyer']);
 $routes->post('payment/createTransaction', 'PaymentController::createTransaction', ['filter' => 'auth:buyer']);
+$routes->post('payment/verifyStatus', 'PaymentController::verifyStatus', ['filter' => 'auth']);
+$routes->post('payment/simulatePayment', 'PaymentController::simulatePayment', ['filter' => 'auth']);
 
 // Orders - requires login
 $routes->get('order/success/(:any)', 'OrderController::success/$1', ['filter' => 'auth']);

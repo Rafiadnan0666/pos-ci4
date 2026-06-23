@@ -18,8 +18,12 @@
         <?php foreach ($users as $i => $u): ?>
         <div class="neo-card flex items-center justify-between" data-aos="fade-up" data-aos-delay="<?= ($i % 10) * 30 ?>">
             <div class="flex items-center gap-4">
-                <div class="bg-black text-white w-12 h-12 border-4 border-black flex items-center justify-center font-black text-lg">
+                <div class="w-12 h-12 border-4 border-black flex items-center justify-center font-black text-lg overflow-hidden <?= empty($u->avatar) ? 'bg-black text-white' : 'bg-gray-100' ?>">
+                    <?php if (!empty($u->avatar)): ?>
+                    <img src="<?= base_url($u->avatar) ?>" class="w-full h-full object-cover" alt="" />
+                    <?php else: ?>
                     <?= strtoupper(substr($u->name, 0, 1)) ?>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <h3 class="font-heading font-bold"><?= $u->name ?></h3>

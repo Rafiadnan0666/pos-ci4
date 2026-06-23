@@ -126,6 +126,9 @@ class Pos extends BaseController
                 'quantity'   => 1,
                 'image'      => $product->image,
                 'stock'      => $product->stock,
+                'size'       => $product->size,
+                'color'      => $product->color,
+                'material'   => $product->material,
             ];
         }
 

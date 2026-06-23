@@ -16,6 +16,7 @@ class OrderModel extends Model
         'order_number', 'buyer_id',
         'shipping_address', 'city_id', 'courier_name', 'courier_service',
         'shipping_cost', 'gross_amount', 'payment_status', 'midtrans_snap_token',
+        'biteship_order_id', 'tracking_number', 'tracking_url',
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -57,9 +58,26 @@ class OrderModel extends Model
 
     public function getWithItems(string $orderNumber)
     {
-        return $this->select('orders.*, users.name as buyer_name, users.email as buyer_email')
+        return $this->select('orders.*, users.name as buyer_name, users.email as buyer_email, users.phone as buyer_phone')
             ->join('users', 'users.id = orders.buyer_id')
             ->where('order_number', $orderNumber)
             ->first();
+    }
+
+    public function updateBiteship(int $orderId, array $biteshipData): bool
+    {
+        $update = [];
+        if (!empty($biteshipData['biteship_order_id'])) {
+            $update['biteship_order_id'] = $biteshipData['biteship_order_id'];
+        }
+        if (!empty($biteshipData['tracking_number'])) {
+            $update['tracking_number'] = $biteshipData['tracking_number'];
+        }
+        if (!empty($biteshipData['tracking_url'])) {
+            $update['tracking_url'] = $biteshipData['tracking_url'];
+        }
+        if (empty($update)) return false;
+
+        return $this->update($orderId, $update);
     }
 }

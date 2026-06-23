@@ -113,7 +113,7 @@ class Biteship
         $payload = [
             'origin_contact_name'       => $params['origin_contact_name'] ?? 'Store Owner',
             'origin_contact_phone'      => $params['origin_contact_phone'] ?? '02112345678',
-            'origin_address'            => $params['origin_address'] ?? '',
+            'origin_address'            => $params['origin_address'] ?? $this->config->originAddress,
             'origin_note'               => $params['origin_note'] ?? '',
             'origin_postal_code'        => $params['origin_postal_code'] ?? $this->config->originPostalCode,
             'destination_contact_name'  => $params['destination_contact_name'] ?? '',

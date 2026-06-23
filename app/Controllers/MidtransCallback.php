@@ -67,7 +67,7 @@ class MidtransCallback extends BaseController
             $this->handleSettlement($order);
         }
 
-        if (in_array($paymentStatus, ['expire', 'deny'], true)) {
+        if (in_array($paymentStatus, ['expire', 'deny'], true) && $oldStatus !== 'settlement') {
             $items = $this->orderItemModel->getByOrderId($order->id);
             foreach ($items as $item) {
                 $this->productModel->set('stock', "stock + {$item->quantity}", false)
@@ -102,10 +102,16 @@ class MidtransCallback extends BaseController
             ];
         }
 
-        $addressParts = explode(',', $order->shipping_address);
-        $postalCode   = trim(end($addressParts));
+        preg_match('/\b\d{5}\b/', $order->shipping_address, $matches);
+        $postalCode = $matches[0] ?? '10110';
+
+        $biteshipConfig = config('Biteship');
 
         $result = $this->biteship->createShipment([
+            'origin_contact_name'       => $biteshipConfig->originContactName ?? 'Store Owner',
+            'origin_contact_phone'      => $biteshipConfig->originContactPhone ?? '02112345678',
+            'origin_address'            => $biteshipConfig->originAddress,
+            'origin_postal_code'        => $biteshipConfig->originPostalCode,
             'destination_contact_name'  => $order->buyer_name ?? 'Customer',
             'destination_contact_phone' => $order->buyer_phone ?? '-',
             'destination_address'       => $order->shipping_address,
@@ -115,6 +121,25 @@ class MidtransCallback extends BaseController
             'items'                     => $shipmentItems,
         ]);
 
-        log_message('info', 'Biteship shipment created for order ' . $order->order_number . ': ' . json_encode($result));
+        if ($result['success']) {
+            $data = $result['data'] ?? [];
+            $update = [];
+            if (!empty($data['id'])) {
+                $update['biteship_order_id'] = $data['id'];
+            }
+            if (!empty($data['tracking_number'])) {
+                $update['tracking_number'] = $data['tracking_number'];
+            }
+            if (!empty($data['tracking_url'])) {
+                $update['tracking_url'] = $data['tracking_url'];
+            } elseif (!empty($data['tracking_id'])) {
+                $update['tracking_url'] = 'https://biteship.com/tracking/' . $data['tracking_id'];
+            }
+            if (!empty($update)) {
+                $this->orderModel->update($order->id, $update);
+            }
+        }
+
+        log_message('info', 'Biteship shipment result for order ' . $order->order_number . ': ' . json_encode($result));
     }
 }

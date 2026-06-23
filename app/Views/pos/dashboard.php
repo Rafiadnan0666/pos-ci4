@@ -48,8 +48,9 @@
                 <div class="neo-card cursor-pointer hover:bg-neo-yellow transition-colors product-card"
                      data-id="<?= $p->id ?>"
                      data-stock="<?= $p->stock ?>">
-                    <div class="bg-gray-100 border-2 border-black mb-2 h-28 flex items-center justify-center text-4xl">
+                    <div class="bg-gray-100 border-2 border-black mb-2 h-28 flex items-center justify-center text-4xl overflow-hidden">
                         <?php if ($p->image): ?>
+                        <img src="<?= base_url($p->image) ?>" alt="<?= $p->name ?>" class="w-full h-full object-cover" />
                         <?php else: ?>
                         <?php
                         $icons = ['Tents' => '⛺', 'Packs' => '🎒', 'Apparel' => '🧥', 'Cooking' => '🍳'];
@@ -58,6 +59,10 @@
                         <?php endif; ?>
                     </div>
                     <h3 class="font-heading font-bold text-sm uppercase leading-tight"><?= $p->name ?></h3>
+                    <?php $pattrs = array_filter([$p->size ?? '', $p->color ?? '', $p->material ?? '']); ?>
+                    <?php if (!empty($pattrs)): ?>
+                    <p class="text-xs font-bold text-gray-500"><?= implode(' | ', $pattrs) ?></p>
+                    <?php endif; ?>
                     <div class="flex items-center justify-between mt-1">
                         <span class="font-bold text-sm">Rp <?= number_format($p->price, 0, ',', '.') ?></span>
                         <span class="text-xs font-bold <?= $p->stock < 5 ? 'text-neo-red' : '' ?>">
@@ -165,7 +170,15 @@ document.getElementById('payment-link-btn')?.addEventListener('click', function 
         if (data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
                 onSuccess: function () {
-                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    fetch('<?= base_url('payment/verifyStatus') ?>', {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'order_number=' + encodeURIComponent(data.order_number)
+                    }).then(function () {
+                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    }).catch(function () {
+                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    });
                 },
                 onPending: function () {
                     window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;

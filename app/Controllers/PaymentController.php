@@ -4,15 +4,150 @@ namespace App\Controllers;
 
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
+use App\Models\ProductModel;
 use App\Libraries\Midtrans;
+use App\Libraries\Biteship;
 
 class PaymentController extends BaseController
 {
     private Midtrans $midtrans;
+    private OrderModel $orderModel;
+    private OrderItemModel $orderItemModel;
+    private ProductModel $productModel;
+    private Biteship $biteship;
 
     public function __construct()
     {
-        $this->midtrans = new Midtrans();
+        $this->midtrans       = new Midtrans();
+        $this->orderModel     = model('App\Models\OrderModel');
+        $this->orderItemModel = model('App\Models\OrderItemModel');
+        $this->productModel   = model('App\Models\ProductModel');
+        $this->biteship       = new Biteship();
+    }
+
+    public function verifyStatus()
+    {
+        $orderNumber = $this->request->getPost('order_number');
+
+        if (!$orderNumber) {
+            return $this->response->setJSON(['success' => false]);
+        }
+
+        $order = $this->orderModel->where('order_number', $orderNumber)->first();
+
+        if (!$order) {
+            return $this->response->setJSON(['success' => false]);
+        }
+
+        if ($order->payment_status === 'settlement') {
+            return $this->response->setJSON(['success' => true, 'status' => 'settlement']);
+        }
+
+        $midtransStatus = $this->midtrans->getTransactionStatus($orderNumber);
+
+        if ($midtransStatus['success']) {
+            $status = $midtransStatus['payment_status'];
+            if ($status === 'settlement' && $order->payment_status !== 'settlement') {
+                $this->orderModel->update($order->id, ['payment_status' => $status]);
+                $this->processSettlement($order->id);
+            }
+            return $this->response->setJSON(['success' => true, 'status' => $status]);
+        }
+
+        return $this->response->setJSON(['success' => false, 'error' => 'Midtrans API unreachable']);
+    }
+
+    public function simulatePayment()
+    {
+        $orderNumber = $this->request->getPost('order_number');
+        if (!$orderNumber) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Missing order number']);
+        }
+
+        $env = env('CI_ENVIRONMENT', 'production');
+        $isProduction = (bool) env('MIDTRANS_IS_PRODUCTION', false);
+        if ($isProduction || $env === 'production') {
+            return $this->response->setJSON(['success' => false, 'error' => 'Only available in dev/sandbox mode']);
+        }
+
+        $order = $this->orderModel->where('order_number', $orderNumber)->first();
+        if (!$order) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Order not found']);
+        }
+
+        if ($order->payment_status === 'settlement') {
+            return $this->response->setJSON(['success' => true, 'status' => 'settlement']);
+        }
+
+        $this->orderModel->update($order->id, ['payment_status' => 'settlement']);
+        $this->processSettlement($order->id);
+
+        return $this->response->setJSON(['success' => true, 'status' => 'settlement']);
+    }
+
+    private function processSettlement(int $orderId)
+    {
+        $plain = $this->orderModel->find($orderId);
+        if (!$plain) return;
+        $order = $this->orderModel->getWithItems($plain->order_number);
+        if (!$order) return;
+
+        $items = $this->orderItemModel->getByOrderId($orderId);
+        foreach ($items as $item) {
+            $this->productModel->decrementStock($item->product_id, $item->quantity);
+        }
+
+        if (!$order->courier_name || !$order->shipping_address) return;
+
+        $shipmentItems = [];
+        foreach ($items as $item) {
+            $shipmentItems[] = [
+                'name'        => $item->name,
+                'description' => '',
+                'value'       => (int) ($item->price * $item->quantity),
+                'weight'      => $item->weight_grams * $item->quantity,
+                'quantity'    => $item->quantity,
+            ];
+        }
+
+        preg_match('/\b\d{5}\b/', $order->shipping_address, $matches);
+        $postalCode = $matches[0] ?? '10110';
+        $biteshipConfig = config('Biteship');
+
+        $result = $this->biteship->createShipment([
+            'origin_contact_name'       => $biteshipConfig->originContactName ?? 'Store Owner',
+            'origin_contact_phone'      => $biteshipConfig->originContactPhone ?? '02112345678',
+            'origin_address'            => $biteshipConfig->originAddress,
+            'origin_postal_code'        => $biteshipConfig->originPostalCode,
+            'destination_contact_name'  => $order->buyer_name ?? 'Customer',
+            'destination_contact_phone' => $order->buyer_phone ?? '-',
+            'destination_address'       => $order->shipping_address,
+            'destination_postal_code'   => $postalCode,
+            'courier_company'           => $order->courier_name,
+            'courier_type'              => $order->courier_service,
+            'items'                     => $shipmentItems,
+        ]);
+
+        if ($result['success']) {
+            $data = $result['data'] ?? [];
+            $update = [];
+            if (!empty($data['id'])) {
+                $update['biteship_order_id'] = $data['id'];
+            }
+            if (!empty($data['tracking_number'])) {
+                $update['tracking_number'] = $data['tracking_number'];
+            }
+            if (!empty($data['tracking_url'])) {
+                $update['tracking_url'] = $data['tracking_url'];
+            } elseif (!empty($data['tracking_id'])) {
+                $update['tracking_url'] = 'https://biteship.com/tracking/' . $data['tracking_id'];
+            }
+            if (!empty($update)) {
+                $this->orderModel->update($orderId, $update);
+            }
+        }
+
+        log_message('info', "Biteship shipment result for order {$plain->order_number}: " . json_encode($result));
     }
 
     public function createTransaction()
@@ -42,11 +177,9 @@ class PaymentController extends BaseController
             ]);
         }
 
-        $subtotal    = 0;
-        $totalWeight = 0;
+        $subtotal = 0;
         foreach ($cart as $item) {
-            $subtotal    += $item['price'] * $item['quantity'];
-            $totalWeight += ($item['weight'] ?? 0) * $item['quantity'];
+            $subtotal += $item['price'] * $item['quantity'];
         }
 
         $shippingCost = (float) $this->request->getPost('shipping_cost');

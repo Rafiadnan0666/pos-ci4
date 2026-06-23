@@ -7,6 +7,7 @@ use App\Models\OrderItemModel;
 use App\Models\ProductModel;
 use App\Models\UserModel;
 use App\Models\CategoryModel;
+use App\Libraries\Biteship;
 
 class Admin extends BaseController
 {
@@ -130,9 +131,11 @@ class Admin extends BaseController
 
         if ($this->request->getMethod() === 'POST') {
             $rules = [
-                'name'  => 'required|max_length[100]',
-                'email' => 'required|valid_email',
-                'role'  => 'required|in_list[buyer,owner]',
+                'name'    => 'required|max_length[100]',
+                'email'   => 'required|valid_email',
+                'role'    => 'required|in_list[buyer,owner]',
+                'phone'   => 'permit_empty|max_length[20]',
+                'address' => 'permit_empty',
             ];
 
             if ($user->email !== $this->request->getPost('email')) {
@@ -143,10 +146,26 @@ class Admin extends BaseController
                 return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
             }
 
+            $avatar = $user->avatar;
+            $file = $this->request->getFile('avatar');
+            if ($file && $file->isValid() && in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'], true)) {
+                if ($file->getSize() <= 2 * 1024 * 1024) {
+                    $name = $file->getRandomName();
+                    $file->move(ROOTPATH . 'public/uploads/avatars', $name);
+                    $avatar = 'uploads/avatars/' . $name;
+                    if ($user->avatar && file_exists(ROOTPATH . 'public/' . $user->avatar)) {
+                        @unlink(ROOTPATH . 'public/' . $user->avatar);
+                    }
+                }
+            }
+
             $this->userModel->update($id, [
-                'name'  => $this->request->getPost('name'),
-                'email' => $this->request->getPost('email'),
-                'role'  => $this->request->getPost('role'),
+                'name'    => $this->request->getPost('name'),
+                'email'   => $this->request->getPost('email'),
+                'role'    => $this->request->getPost('role'),
+                'phone'   => $this->request->getPost('phone') ?: null,
+                'address' => $this->request->getPost('address') ?: null,
+                'avatar'  => $avatar,
             ]);
 
             return redirect()->to('/admin/users')->with('message', 'User updated successfully');
@@ -224,8 +243,13 @@ class Admin extends BaseController
             return $existingImage;
         }
 
+        $uploadDir = ROOTPATH . 'public/uploads/products';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0755, true);
+        }
+
         $name = $file->getRandomName();
-        $file->move(ROOTPATH . 'public/uploads/products', $name);
+        $file->move($uploadDir, $name);
 
         $path = 'uploads/products/' . $name;
 
@@ -248,6 +272,9 @@ class Admin extends BaseController
                 'price'        => 'required|numeric|greater_than[0]',
                 'stock'        => 'required|integer|greater_than_equal_to[0]',
                 'weight_grams' => 'required|integer|greater_than[0]',
+                'size'         => 'permit_empty|max_length[50]',
+                'color'        => 'permit_empty|max_length[50]',
+                'material'     => 'permit_empty|max_length[100]',
             ];
 
             if (!$this->validate($rules)) {
@@ -277,6 +304,9 @@ class Admin extends BaseController
                 'price'        => (float) $this->request->getPost('price'),
                 'stock'        => (int) $this->request->getPost('stock'),
                 'weight_grams' => (int) $this->request->getPost('weight_grams'),
+                'size'         => $this->request->getPost('size') ?: null,
+                'color'        => $this->request->getPost('color') ?: null,
+                'material'     => $this->request->getPost('material') ?: null,
                 'image'        => $image,
             ]);
 
@@ -306,6 +336,9 @@ class Admin extends BaseController
                 'price'        => 'required|numeric|greater_than[0]',
                 'stock'        => 'required|integer|greater_than_equal_to[0]',
                 'weight_grams' => 'required|integer|greater_than[0]',
+                'size'         => 'permit_empty|max_length[50]',
+                'color'        => 'permit_empty|max_length[50]',
+                'material'     => 'permit_empty|max_length[100]',
             ];
 
             if (!$this->validate($rules)) {
@@ -334,6 +367,9 @@ class Admin extends BaseController
                 'price'        => (float) $this->request->getPost('price'),
                 'stock'        => (int) $this->request->getPost('stock'),
                 'weight_grams' => (int) $this->request->getPost('weight_grams'),
+                'size'         => $this->request->getPost('size') ?: null,
+                'color'        => $this->request->getPost('color') ?: null,
+                'material'     => $this->request->getPost('material') ?: null,
                 'image'        => $image,
             ];
 
@@ -482,9 +518,80 @@ class Admin extends BaseController
             return $this->response->setJSON(['success' => false, 'error' => 'Invalid status']);
         }
 
+        $order = $this->orderModel->find($orderId);
+        if (!$order) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Order not found']);
+        }
+
         $this->orderModel->update($orderId, ['payment_status' => $status]);
 
+        if ($status === 'settlement' && $order->payment_status !== 'settlement') {
+            $this->processOrderSettlement($order);
+        }
+
         return $this->response->setJSON(['success' => true]);
+    }
+
+    private function processOrderSettlement($order)
+    {
+        $items = $this->orderItemModel->getByOrderId($order->id);
+
+        foreach ($items as $item) {
+            $this->productModel->decrementStock($item->product_id, $item->quantity);
+        }
+
+        if (!$order->courier_name || !$order->shipping_address) return;
+
+        $shipmentItems = [];
+        foreach ($items as $item) {
+            $shipmentItems[] = [
+                'name'        => $item->name,
+                'description' => '',
+                'value'       => (int) ($item->price * $item->quantity),
+                'weight'      => $item->weight_grams * $item->quantity,
+                'quantity'    => $item->quantity,
+            ];
+        }
+
+        preg_match('/\b\d{5}\b/', $order->shipping_address, $matches);
+        $postalCode = $matches[0] ?? '10110';
+        $biteshipConfig = config('Biteship');
+        $biteship = new Biteship();
+
+        $result = $biteship->createShipment([
+            'origin_contact_name'       => $biteshipConfig->originContactName ?? 'Store Owner',
+            'origin_contact_phone'      => $biteshipConfig->originContactPhone ?? '02112345678',
+            'origin_address'            => $biteshipConfig->originAddress,
+            'origin_postal_code'        => $biteshipConfig->originPostalCode,
+            'destination_contact_name'  => $order->buyer_name ?? 'Customer',
+            'destination_contact_phone' => $order->buyer_phone ?? '-',
+            'destination_address'       => $order->shipping_address,
+            'destination_postal_code'   => $postalCode,
+            'courier_company'           => $order->courier_name,
+            'courier_type'              => $order->courier_service,
+            'items'                     => $shipmentItems,
+        ]);
+
+        if ($result['success']) {
+            $data = $result['data'] ?? [];
+            $update = [];
+            if (!empty($data['id'])) {
+                $update['biteship_order_id'] = $data['id'];
+            }
+            if (!empty($data['tracking_number'])) {
+                $update['tracking_number'] = $data['tracking_number'];
+            }
+            if (!empty($data['tracking_url'])) {
+                $update['tracking_url'] = $data['tracking_url'];
+            } elseif (!empty($data['tracking_id'])) {
+                $update['tracking_url'] = 'https://biteship.com/tracking/' . $data['tracking_id'];
+            }
+            if (!empty($update)) {
+                $this->orderModel->update($order->id, $update);
+            }
+        }
+
+        log_message('info', "Admin Biteship shipment for order {$order->order_number}: " . json_encode($result));
     }
 
     public function testApi()

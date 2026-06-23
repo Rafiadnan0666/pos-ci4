@@ -64,6 +64,9 @@ class Cart extends BaseController
                 'image'      => $product->image,
                 'slug'       => $product->slug,
                 'stock'      => $product->stock,
+                'size'       => $product->size,
+                'color'      => $product->color,
+                'material'   => $product->material,
             ];
         }
 

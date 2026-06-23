@@ -25,18 +25,15 @@ class Checkout extends BaseController
             return redirect()->to('/cart')->with('error', 'Your cart is empty');
         }
 
-        $totalWeight = 0;
-        $subtotal    = 0;
+        $subtotal = 0;
         foreach ($cart as $item) {
-            $totalWeight += ($item['weight'] ?? 0) * $item['quantity'];
-            $subtotal    += $item['price'] * $item['quantity'];
+            $subtotal += $item['price'] * $item['quantity'];
         }
 
         return view('checkout/index', [
-            'cart'        => $cart,
-            'subtotal'    => $subtotal,
-            'totalWeight' => $totalWeight,
-            'user'        => [
+            'cart'     => $cart,
+            'subtotal' => $subtotal,
+            'user'     => [
                 'name'  => session()->get('name'),
                 'email' => session()->get('email'),
             ],

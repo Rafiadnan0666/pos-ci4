@@ -26,11 +26,19 @@
         <div class="lg:col-span-2 space-y-4">
             <?php foreach ($cart as $id => $item): ?>
             <div class="neo-card flex items-start gap-4 cart-item" data-id="<?= $id ?>" data-aos="fade-up">
-                <div class="bg-gray-100 border-2 border-black w-20 h-20 flex items-center justify-center text-2xl flex-shrink-0">
+                <div class="bg-gray-100 border-2 border-black w-20 h-20 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    <?php if (!empty($item['image'])): ?>
+                    <img src="<?= base_url($item['image']) ?>" alt="<?= $item['name'] ?>" class="w-full h-full object-cover" />
+                    <?php else: ?>
                     📦
+                    <?php endif; ?>
                 </div>
                 <div class="flex-1 min-w-0">
                     <h3 class="font-heading font-bold text-base uppercase"><?= $item['name'] ?></h3>
+                    <?php $cartAttrs = array_filter([$item['size'] ?? '', $item['color'] ?? '', $item['material'] ?? '']); ?>
+                    <?php if (!empty($cartAttrs)): ?>
+                    <p class="text-xs font-bold text-gray-500 mt-1"><?= implode(' | ', $cartAttrs) ?></p>
+                    <?php endif; ?>
                     <p class="font-bold text-sm mt-1">Rp <?= number_format($item['price'], 0, ',', '.') ?></p>
                     <div class="flex items-center gap-3 mt-2">
                         <button class="neo-btn-white !px-2 !py-0.5 text-sm qty-dec" data-id="<?= $id ?>">-</button>

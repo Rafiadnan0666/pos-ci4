@@ -3,15 +3,20 @@
 <?= $this->section('content') ?>
 <div class="max-w-3xl mx-auto px-4 py-12">
     <div class="text-center mb-8" data-aos="zoom-in">
-        <div id="status-icon" class="text-6xl block mb-4"><?= $order->payment_status === 'settlement' ? '✅' : '⏳' ?></div>
-        <div id="status-card" class="<?= $order->payment_status === 'settlement' ? 'neo-card-green' : 'neo-card-yellow' ?>">
+        <?php $snapClosed = (bool) (request()->getGet('closed') ?? false); ?>
+        <div id="status-icon" class="text-6xl block mb-4"><?= $order->payment_status === 'settlement' ? '✅' : ($snapClosed ? '⚠️' : '⏳') ?></div>
+        <div id="status-card" class="<?= $order->payment_status === 'settlement' ? 'neo-card-green' : ($snapClosed ? 'neo-card-orange' : 'neo-card-yellow') ?>">
             <h1 class="text-3xl font-black">
-                <?= $order->payment_status === 'settlement' ? 'PAYMENT CONFIRMED!' : 'ORDER PLACED!' ?>
+                <?= $order->payment_status === 'settlement' ? 'PAYMENT CONFIRMED!' : ($snapClosed ? 'PAYMENT INCOMPLETE' : 'ORDER PLACED!') ?>
             </h1>
             <p class="font-bold mt-2">
-                <?= $order->payment_status === 'settlement'
-                    ? 'Your payment has been confirmed. Thank you!'
-                    : 'Your order is pending payment confirmation.' ?>
+                <?php if ($order->payment_status === 'settlement'): ?>
+                    Your payment has been confirmed. Thank you!
+                <?php elseif ($snapClosed): ?>
+                    You closed the payment popup before completing. Please complete your payment from the order page.
+                <?php else: ?>
+                    Your order is pending payment confirmation.
+                <?php endif; ?>
             </p>
             <?php if ($order->payment_status === 'pending'): ?>
             <div id="status-polling" class="mt-3 text-sm">
@@ -99,34 +104,120 @@
 </div>
 
 <?php if ($order->payment_status === 'pending'): ?>
+<div class="neo-card-orange !text-white text-center mb-6" data-aos="fade-up">
+    <p class="font-bold">
+        💡 If you paid with QRIS (GoPay/Dana) in sandbox mode, payments are simulated.
+    </p>
+    <button id="simulate-payment" class="neo-btn-yellow !text-black mt-2 text-sm" data-order="<?= $order->order_number ?>">
+        ⚡ Simulate Payment (Sandbox Only)
+    </button>
+    <p class="text-xs mt-2 opacity-80">This simulates a successful Midtrans settlement for testing.</p>
+</div>
+
 <script>
-(function pollStatus() {
-    fetch('<?= base_url('order/detail/' . $order->order_number) ?>?ajax=1', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+document.getElementById('simulate-payment')?.addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Simulating...';
+    fetch('<?= base_url('payment/simulatePayment') ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'order_number=' + encodeURIComponent(this.dataset.order)
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.status === 'settlement') {
-            document.getElementById('status-icon').textContent = '✅';
-            document.getElementById('status-card').className = 'neo-card-green';
-            document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT CONFIRMED!';
-            document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
-            document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
-            document.getElementById('status-badge').textContent = 'SETTLEMENT';
-            document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
-        } else if (data.status === 'expire' || data.status === 'deny') {
-            document.getElementById('status-icon').textContent = '❌';
-            document.getElementById('status-card').className = 'neo-card-orange';
-            document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT FAILED';
-            document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold text-white">Payment ' + data.status + ' — please try again.</span>';
-            document.getElementById('status-badge').textContent = data.status.toUpperCase();
-            document.getElementById('status-badge').className = 'neo-badge bg-[#EF4444] text-white';
+        if (data.success) {
+            location.reload();
         } else {
-            setTimeout(pollStatus, 3000);
+            btn.disabled = false;
+            btn.textContent = '⚡ Simulate Payment (Sandbox Only)';
+            alert(data.error || 'Failed to simulate payment');
         }
     })
     .catch(function() {
-        setTimeout(pollStatus, 5000);
+        btn.disabled = false;
+        btn.textContent = '⚡ Simulate Payment (Sandbox Only)';
+        alert('Network error');
+    });
+});
+
+(function pollStatus() {
+    fetch('<?= base_url('payment/verifyStatus') ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'order_number=<?= $order->order_number ?>'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(verifyData) {
+        if (verifyData.success && (verifyData.status === 'settlement' || verifyData.status === 'expire' || verifyData.status === 'deny')) {
+            if (verifyData.status === 'settlement') {
+                document.getElementById('status-icon').textContent = '✅';
+                document.getElementById('status-card').className = 'neo-card-green';
+                document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT CONFIRMED!';
+                document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
+                document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
+                document.getElementById('status-badge').textContent = 'SETTLEMENT';
+                document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
+                return;
+            } else {
+                document.getElementById('status-icon').textContent = '❌';
+                document.getElementById('status-card').className = 'neo-card-orange';
+                document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT FAILED';
+                document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold text-white">Payment ' + verifyData.status + ' — please try again.</span>';
+                document.getElementById('status-badge').textContent = verifyData.status.toUpperCase();
+                document.getElementById('status-badge').className = 'neo-badge bg-[#EF4444] text-white';
+                return;
+            }
+        }
+        fetch('<?= base_url('order/detail/' . $order->order_number) ?>?ajax=1', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.status === 'settlement') {
+                document.getElementById('status-icon').textContent = '✅';
+                document.getElementById('status-card').className = 'neo-card-green';
+                document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT CONFIRMED!';
+                document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
+                document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
+                document.getElementById('status-badge').textContent = 'SETTLEMENT';
+                document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
+            } else if (data.status === 'expire' || data.status === 'deny') {
+                document.getElementById('status-icon').textContent = '❌';
+                document.getElementById('status-card').className = 'neo-card-orange';
+                document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT FAILED';
+                document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold text-white">Payment ' + data.status + ' — please try again.</span>';
+                document.getElementById('status-badge').textContent = data.status.toUpperCase();
+                document.getElementById('status-badge').className = 'neo-badge bg-[#EF4444] text-white';
+            } else {
+                setTimeout(pollStatus, 3000);
+            }
+        })
+        .catch(function() {
+            setTimeout(pollStatus, 5000);
+        });
+    })
+    .catch(function() {
+        fetch('<?= base_url('order/detail/' . $order->order_number) ?>?ajax=1', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.status === 'settlement') {
+                document.getElementById('status-icon').textContent = '✅';
+                document.getElementById('status-card').className = 'neo-card-green';
+                document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT CONFIRMED!';
+                document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
+                document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
+                document.getElementById('status-badge').textContent = 'SETTLEMENT';
+                document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
+            } else {
+                setTimeout(pollStatus, 5000);
+            }
+        })
+        .catch(function() {
+            setTimeout(pollStatus, 5000);
+        });
     });
 })();
 </script>

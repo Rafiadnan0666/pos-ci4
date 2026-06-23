@@ -55,28 +55,28 @@
 
             <div class="neo-card" data-aos="fade-up">
                 <h2 class="text-lg font-black mb-4">SHIPPING COURIER</h2>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-heading font-bold text-sm mb-1">Courier *</label>
-                            <input type="text" id="courier-name" class="neo-input" placeholder="JNE / TIKI / SiCepat" value="JNE" />
-                        </div>
-                        <div>
-                            <label class="block font-heading font-bold text-sm mb-1">Service *</label>
-                            <input type="text" id="courier-service" class="neo-input" placeholder="REG / ECO / OKE" value="REG" />
-                        </div>
+                <div class="space-y-3">
+                    <label class="block font-heading font-bold text-sm mb-1">Choose Courier Provider *</label>
+                    <div class="flex flex-wrap gap-2" id="courier-providers">
+                        <label class="neo-btn-white text-sm cursor-pointer has-[:checked]:bg-neo-yellow">
+                            <input type="checkbox" name="couriers" value="jne" class="hidden" checked /> JNE
+                        </label>
+                        <label class="neo-btn-white text-sm cursor-pointer has-[:checked]:bg-neo-yellow">
+                            <input type="checkbox" name="couriers" value="tiki" class="hidden" /> TIKI
+                        </label>
+                        <label class="neo-btn-white text-sm cursor-pointer has-[:checked]:bg-neo-yellow">
+                            <input type="checkbox" name="couriers" value="sicepat" class="hidden" /> SiCepat
+                        </label>
+                        <label class="neo-btn-white text-sm cursor-pointer has-[:checked]:bg-neo-yellow">
+                            <input type="checkbox" name="couriers" value="pos" class="hidden" /> POS
+                        </label>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-heading font-bold text-sm mb-1">Shipping Cost (Rp) *</label>
-                            <input type="number" id="shipping-cost-input" class="neo-input" placeholder="e.g. 15000" min="0" />
-                        </div>
-                        <div>
-                            <label class="block font-heading font-bold text-sm mb-1">Estimation</label>
-                            <input type="text" id="shipping-estimation" class="neo-input" placeholder="e.g. 2-3 days" />
-                        </div>
+                    <button id="get-rates" class="neo-btn-cyan text-sm" disabled>Get Shipping Rates</button>
+                    <div id="rates-loading" class="hidden text-sm font-bold">Loading rates...</div>
+                    <div id="rates-list" class="space-y-2"></div>
+                    <div id="selected-rate-display" class="hidden neo-card-green !p-3 text-sm font-bold">
+                        Selected: <span id="selected-rate-text"></span>
                     </div>
-                    <button id="apply-shipping" class="neo-btn-cyan text-sm">Apply Shipping</button>
                 </div>
             </div>
         </div>
@@ -123,9 +123,12 @@
 
 <script>
 let selectedShipping = null;
+let rateCache = null;
+
+// ─── City Search (OpenStreetMap) ─────────────────────────────────────
 
 document.getElementById('city_search').addEventListener('input', function () {
-    const query = this.value;
+    const query = this.value.trim();
     if (query.length < 3) {
         document.getElementById('city_results').classList.add('hidden');
         document.getElementById('city_results').innerHTML = '';
@@ -146,8 +149,6 @@ document.getElementById('city_search').addEventListener('input', function () {
                 const div = document.createElement('div');
                 div.className = 'p-3 border-b-2 border-black cursor-pointer hover:bg-[#FFDE4D] font-bold text-sm';
                 div.textContent = place.display_name;
-                div.dataset.lat = place.lat;
-                div.dataset.lon = place.lon;
                 div.dataset.postalCode = place.address?.postcode || '';
                 div.dataset.city = place.address?.city || place.address?.town || place.address?.county || '';
                 div.addEventListener('click', function () {
@@ -155,6 +156,7 @@ document.getElementById('city_search').addEventListener('input', function () {
                     document.getElementById('postal_code').value = this.dataset.postalCode;
                     document.getElementById('city_name').value = this.dataset.city;
                     container.classList.add('hidden');
+                    enableGetRates();
                 });
                 container.appendChild(div);
             });
@@ -162,9 +164,7 @@ document.getElementById('city_search').addEventListener('input', function () {
             container.classList.add('hidden');
         }
     })
-    .catch(function () {
-        // silent fail — user can type postal code manually
-    });
+    .catch(function () {});
 });
 
 document.addEventListener('click', function (e) {
@@ -173,31 +173,117 @@ document.addEventListener('click', function (e) {
     }
 });
 
-document.getElementById('apply-shipping')?.addEventListener('click', function () {
-    const cost = parseInt(document.getElementById('shipping-cost-input').value);
-    const courier = document.getElementById('courier-name').value.trim();
-    const service = document.getElementById('courier-service').value.trim();
+document.getElementById('postal_code').addEventListener('input', enableGetRates);
 
-    if (!cost || cost < 0) {
-        document.getElementById('shipping-error').textContent = 'Enter a valid shipping cost';
+// ─── Courier Selection & Rates ─────────────────────────────────────
+
+function getSelectedCouriers() {
+    const checked = document.querySelectorAll('#courier-providers input:checked');
+    return Array.from(checked).map(function (cb) { return cb.value; }).join(',');
+}
+
+document.querySelectorAll('#courier-providers input').forEach(function (cb) {
+    cb.addEventListener('change', enableGetRates);
+});
+
+function enableGetRates() {
+    const postalCode = document.getElementById('postal_code').value.trim();
+    const couriers = getSelectedCouriers();
+    document.getElementById('get-rates').disabled = !postalCode || !couriers;
+}
+
+document.getElementById('get-rates').addEventListener('click', function () {
+    const postalCode = document.getElementById('postal_code').value.trim();
+    const couriers = getSelectedCouriers();
+
+    if (!postalCode) {
+        document.getElementById('shipping-error').textContent = 'Enter a postal code first';
         document.getElementById('shipping-error').classList.remove('hidden');
         return;
     }
-    if (!courier) {
-        document.getElementById('shipping-error').textContent = 'Enter courier name';
+    if (!couriers) {
+        document.getElementById('shipping-error').textContent = 'Select at least one courier';
         document.getElementById('shipping-error').classList.remove('hidden');
         return;
     }
     document.getElementById('shipping-error').classList.add('hidden');
 
-    selectedShipping = {
-        name: courier,
-        service: service || 'Standard',
-        cost: cost,
-        estimation: document.getElementById('shipping-estimation').value || ''
-    };
-    updateTotal();
+    const btn = this;
+    btn.disabled = true;
+    document.getElementById('rates-loading').classList.remove('hidden');
+    document.getElementById('rates-list').innerHTML = '';
+
+    const formData = new FormData();
+    formData.append('postal_code', postalCode);
+    formData.append('courier', couriers);
+
+    fetch('<?= base_url('shipping/getRates') ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        document.getElementById('rates-loading').classList.add('hidden');
+        btn.disabled = false;
+
+        if (!data.success || !data.rates || data.rates.length === 0) {
+            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">No rates found for the selected couriers.</p>';
+            return;
+        }
+
+        rateCache = data.rates;
+        renderRates(data.rates);
+    })
+    .catch(function () {
+        document.getElementById('rates-loading').classList.add('hidden');
+        btn.disabled = false;
+        document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">Failed to fetch rates. Try again.</p>';
+    });
 });
+
+function renderRates(rates) {
+    const container = document.getElementById('rates-list');
+    container.innerHTML = '';
+
+    const grouped = {};
+    rates.forEach(function (r) {
+        if (!grouped[r.courier_name]) grouped[r.courier_name] = [];
+        grouped[r.courier_name].push(r);
+    });
+
+    Object.keys(grouped).forEach(function (courier) {
+        const items = grouped[courier];
+        const header = document.createElement('p');
+        header.className = 'font-black text-xs mt-3 mb-1 uppercase';
+        header.textContent = courier;
+        container.appendChild(header);
+
+        items.forEach(function (rate) {
+            const div = document.createElement('div');
+            div.className = 'neo-card !p-3 cursor-pointer hover:bg-neo-yellow transition-colors rate-option text-sm';
+            div.dataset.name = courier;
+            div.dataset.service = rate.service_name;
+            div.dataset.cost = rate.shipping_fee;
+            div.dataset.duration = rate.duration_text || rate.duration || '';
+            div.innerHTML = '<div class="flex items-center justify-between"><span class="font-bold">' + rate.service_name + '</span><span class="font-black">Rp ' + rate.shipping_fee.toLocaleString('id-ID') + '</span></div><div class="text-xs opacity-60 mt-1">' + (rate.duration_text || rate.duration || '—') + '</div>';
+            div.addEventListener('click', function () {
+                document.querySelectorAll('.rate-option').forEach(function (el) { el.classList.remove('bg-neo-yellow'); });
+                this.classList.add('bg-neo-yellow');
+                selectedShipping = {
+                    name: this.dataset.name,
+                    service: this.dataset.service,
+                    cost: parseInt(this.dataset.cost),
+                    estimation: this.dataset.duration
+                };
+                updateTotal();
+            });
+            container.appendChild(div);
+        });
+    });
+}
+
+// ─── Total Update ──────────────────────────────────────────────────
 
 function updateTotal() {
     if (!selectedShipping) return;
@@ -211,8 +297,12 @@ function updateTotal() {
     document.getElementById('shipping-cost').value = shipping;
     document.getElementById('courier-name-val').value = selectedShipping.name;
     document.getElementById('courier-service-val').value = selectedShipping.service;
+    document.getElementById('selected-rate-text').textContent = selectedShipping.name + ' - ' + selectedShipping.service + ' (Rp ' + shipping.toLocaleString('id-ID') + ', ' + selectedShipping.estimation + ')';
+    document.getElementById('selected-rate-display').classList.remove('hidden');
     document.getElementById('pay-now').disabled = false;
 }
+
+// ─── Pay Now ───────────────────────────────────────────────────────
 
 document.getElementById('pay-now').addEventListener('click', function () {
     const errors = [];
@@ -226,7 +316,7 @@ document.getElementById('pay-now').addEventListener('click', function () {
     if (!phone) errors.push('Phone number is required');
     if (!address) errors.push('Shipping address is required');
     if (!postalCode) errors.push('Enter a postal code');
-    if (!shippingCost || shippingCost == 0) errors.push('Apply shipping first');
+    if (!shippingCost || shippingCost == 0) errors.push('Select a shipping rate first');
 
     const errEl = document.getElementById('validation-errors');
     if (errors.length > 0) {
@@ -261,14 +351,30 @@ document.getElementById('pay-now').addEventListener('click', function () {
     .then(function (data) {
         if (data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
-                onSuccess: function () {
-                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                onSuccess: function (result) {
+                    // Verify payment with Midtrans API before redirect
+                    fetch('<?= base_url('payment/verifyStatus') ?>', {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'order_number=' + encodeURIComponent(data.order_number)
+                    }).then(function () {
+                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    }).catch(function () {
+                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    });
                 },
-                onPending: function () {
-                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                onPending: function (result) {
+                    // QRIS/GoPay in sandbox often goes to pending - redirect and poll
+                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number + '?pending=1';
+                },
+                onError: function (result) {
+                    errEl.innerHTML = '⚠️ Payment error: ' + (result.status_message || 'Unknown error') + '. Please try again or use a different payment method.';
+                    errEl.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.textContent = 'PAY NOW';
                 },
                 onClose: function () {
-                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number + '?closed=1';
                 }
             });
         } else {
