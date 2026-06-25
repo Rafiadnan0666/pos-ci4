@@ -1,12 +1,35 @@
 <?= $this->extend('layout/main') ?>
 
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.leaflet-container { border: 4px solid #000; }
+.location-btn { font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; text-transform: uppercase; font-size: .75rem; padding: .5rem 1rem; border: 4px solid #000; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); cursor: pointer; transition: all 75ms; display: inline-flex; align-items: center; justify-content: center; gap: .5rem; }
+.location-btn:hover { translate: 2px 2px; box-shadow: 2px 2px 0px 0px #000; }
+.location-btn:active { translate: 4px 4px; box-shadow: none; }
+</style>
+<?= $this->endSection() ?>
+
 <?= $this->section('content') ?>
 <div class="max-w-7xl mx-auto px-4 py-8">
     <h1 class="text-4xl font-black mb-8 flex items-center gap-3" data-aos="fade-down">
         <span>📋</span> CHECKOUT
     </h1>
 
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+    <div id="payment-success-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="neo-card-green max-w-lg w-full text-center p-8" data-aos="zoom-in">
+            <span class="text-7xl block mb-4">✅</span>
+            <h2 class="text-3xl font-black mb-2">PAYMENT CONFIRMED!</h2>
+            <p class="font-bold text-lg mb-2" id="success-order-number"></p>
+            <p class="text-sm mb-6">Your payment has been processed successfully. Thank you for your order!</p>
+            <div class="flex gap-3 justify-center">
+                <a href="<?= base_url('orders') ?>" class="neo-btn-white text-sm">My Orders</a>
+                <a href="<?= base_url('/') ?>" class="neo-btn-yellow text-sm">Continue Shopping</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8" id="checkout-grid">
         <div class="lg:col-span-3 space-y-6">
             <div class="neo-card" data-aos="fade-up">
                 <h2 class="text-lg font-black mb-4">BUYER INFORMATION</h2>
@@ -50,6 +73,21 @@
                         <label class="block font-heading font-bold text-sm mb-1">Full Address *</label>
                         <textarea id="address" class="neo-input" rows="3" placeholder="Street, district, city, province"></textarea>
                     </div>
+                    <div>
+                        <label class="block font-heading font-bold text-sm mb-1">📍 Pin Location on Map <span class="text-xs opacity-60">(drag the marker or click map)</span></label>
+                        <div id="map" style="height: 300px;" class="border-4 border-black"></div>
+                        <div class="flex gap-2 mt-2">
+                            <button type="button" id="use-current-location" class="location-btn bg-[#FFDE4D] text-black text-xs">
+                                📡 Use My Location
+                            </button>
+                            <button type="button" id="clear-location" class="location-btn bg-white text-black text-xs">
+                                ✕ Clear Pin
+                            </button>
+                        </div>
+                        <input type="hidden" id="latitude" value="" />
+                        <input type="hidden" id="longitude" value="" />
+                        <p id="location-status" class="text-xs font-bold mt-1 text-[#22C55E] hidden">📍 Location pinned</p>
+                    </div>
                 </div>
             </div>
 
@@ -85,9 +123,9 @@
             <div class="neo-card-yellow sticky top-4" data-aos="fade-left">
                 <h3 class="text-lg font-black mb-4">ORDER SUMMARY</h3>
                 <div class="space-y-3">
-                    <?php foreach ($cart as $item): ?>
+                    <?php foreach ($cart as $key => $item): ?>
                     <div class="flex items-center justify-between text-sm">
-                        <span class="font-bold flex-1"><?= $item['name'] ?> <span class="text-xs">x<?= $item['quantity'] ?></span></span>
+                        <span class="font-bold flex-1"><?= $item['name'] ?><?= !empty($item['size']) ? ' <span class="text-xs opacity-60">(' . esc($item['size']) . ')</span>' : '' ?> <span class="text-xs">x<?= $item['quantity'] ?></span></span>
                         <span>Rp <?= number_format($item['price'] * $item['quantity'], 0, ',', '.') ?></span>
                     </div>
                     <?php endforeach; ?>
@@ -113,7 +151,7 @@
                 <div id="validation-errors" class="hidden mt-3 bg-[#EF4444] text-white border-4 border-black p-3 text-sm font-bold"></div>
 
                 <button id="pay-now" class="neo-btn-green w-full mt-4 text-base" disabled>
-                    PAY NOW
+                    💳 PAY NOW
                 </button>
                 <p class="text-xs mt-2 text-center opacity-70">Secure payment via Midtrans</p>
             </div>
@@ -121,9 +159,112 @@
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+let map, marker;
 let selectedShipping = null;
 let rateCache = null;
+
+// ─── Leaflet Map ──────────────────────────────────────────────────
+
+function initMap(lat = -6.9175, lng = 107.6191) {
+    if (map) { map.remove(); }
+    map = L.map('map').setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+    }).addTo(map);
+
+    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+
+    marker.on('dragend', function() {
+        const pos = marker.getLatLng();
+        updateLocation(pos.lat, pos.lng);
+    });
+
+    map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        updateLocation(e.latlng.lat, e.latlng.lng);
+    });
+}
+
+function updateLocation(lat, lng) {
+    document.getElementById('latitude').value = lat.toFixed(6);
+    document.getElementById('longitude').value = lng.toFixed(6);
+    document.getElementById('location-status').classList.remove('hidden');
+
+    reverseGeocode(lat, lng);
+}
+
+function reverseGeocode(lat, lng) {
+    fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&addressdetails=1&accept-language=id', {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.address) {
+            const addr = data.address;
+            const road = addr.road || addr.path || '';
+            const suburb = addr.suburb || addr.neighbourhood || '';
+            const city = addr.city || addr.town || addr.county || addr.state || '';
+            const postcode = addr.postcode || '';
+            const display = data.display_name || '';
+
+            if (!document.getElementById('address').value.trim()) {
+                const parts = [road, suburb].filter(Boolean);
+                document.getElementById('address').value = parts.join(', ') + ', ' + display.split(',')[0];
+            }
+            if (!document.getElementById('city_name').value.trim()) {
+                document.getElementById('city_name').value = city;
+            }
+            if (!document.getElementById('postal_code').value.trim() && postcode) {
+                document.getElementById('postal_code').value = postcode;
+            }
+            if (!document.getElementById('city_search').value.trim()) {
+                document.getElementById('city_search').value = city + ', ' + (addr.country || 'Indonesia');
+            }
+        }
+    })
+    .catch(function() {});
+}
+
+document.getElementById('use-current-location')?.addEventListener('click', function() {
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser');
+        return;
+    }
+    this.textContent = '📍 Locating...';
+    this.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            initMap(lat, lng);
+            document.getElementById('use-current-location').textContent = '✅ Location Found';
+            document.getElementById('use-current-location').disabled = false;
+            setTimeout(function() {
+                document.getElementById('use-current-location').textContent = '📡 Use My Location';
+            }, 3000);
+        },
+        function(err) {
+            alert('Could not get location: ' + err.message);
+            document.getElementById('use-current-location').textContent = '📡 Use My Location';
+            document.getElementById('use-current-location').disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+});
+
+document.getElementById('clear-location')?.addEventListener('click', function() {
+    document.getElementById('latitude').value = '';
+    document.getElementById('longitude').value = '';
+    document.getElementById('location-status').classList.add('hidden');
+    if (marker) marker.remove();
+});
+
+// Initialize default map
+initMap();
 
 // ─── City Search (OpenStreetMap) ─────────────────────────────────────
 
@@ -151,11 +292,19 @@ document.getElementById('city_search').addEventListener('input', function () {
                 div.textContent = place.display_name;
                 div.dataset.postalCode = place.address?.postcode || '';
                 div.dataset.city = place.address?.city || place.address?.town || place.address?.county || '';
+                div.dataset.lat = place.lat;
+                div.dataset.lon = place.lon;
                 div.addEventListener('click', function () {
                     document.getElementById('city_search').value = this.textContent;
                     document.getElementById('postal_code').value = this.dataset.postalCode;
                     document.getElementById('city_name').value = this.dataset.city;
                     container.classList.add('hidden');
+                    if (this.dataset.lat && this.dataset.lon) {
+                        const lat = parseFloat(this.dataset.lat);
+                        const lng = parseFloat(this.dataset.lon);
+                        initMap(lat, lng);
+                        updateLocation(lat, lng);
+                    }
                     enableGetRates();
                 });
                 container.appendChild(div);
@@ -346,6 +495,8 @@ document.getElementById('pay-now').addEventListener('click', function () {
     formData.append('courier_name', document.getElementById('courier-name-val').value);
     formData.append('courier_service', document.getElementById('courier-service-val').value);
     formData.append('shipping_cost', shippingCost);
+    formData.append('latitude', document.getElementById('latitude').value);
+    formData.append('longitude', document.getElementById('longitude').value);
 
     fetch('<?= base_url('payment/createTransaction') ?>', {
         method: 'POST',
@@ -357,44 +508,53 @@ document.getElementById('pay-now').addEventListener('click', function () {
         if (data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
                 onSuccess: function (result) {
-                    // Verify payment with Midtrans API before redirect
+                    // Verify payment then show success overlay instead of redirect
                     fetch('<?= base_url('payment/verifyStatus') ?>', {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: 'order_number=' + encodeURIComponent(data.order_number)
                     }).then(function () {
-                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                        showPaymentSuccess(data.order_number);
                     }).catch(function () {
-                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                        showPaymentSuccess(data.order_number);
                     });
                 },
                 onPending: function (result) {
-                    // QRIS/GoPay in sandbox often goes to pending - redirect and poll
+                    // For pending (QRIS/GoPay), show success page with polling
                     window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number + '?pending=1';
                 },
                 onError: function (result) {
                     errEl.innerHTML = '⚠️ Payment error: ' + (result.status_message || 'Unknown error') + '. Please try again or use a different payment method.';
                     errEl.classList.remove('hidden');
                     btn.disabled = false;
-                    btn.textContent = 'PAY NOW';
+                    btn.textContent = '💳 PAY NOW';
                 },
                 onClose: function () {
-                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number + '?closed=1';
+                    btn.disabled = false;
+                    btn.textContent = '💳 PAY NOW';
+                    errEl.innerHTML = '⚠️ Payment popup closed — you can retry or complete payment later from My Orders.';
+                    errEl.classList.remove('hidden');
                 }
             });
         } else {
             errEl.innerHTML = '⚠️ ' + (data.error || 'Payment failed');
             errEl.classList.remove('hidden');
             btn.disabled = false;
-            btn.textContent = 'PAY NOW';
+            btn.textContent = '💳 PAY NOW';
         }
     })
     .catch(function () {
         errEl.innerHTML = '⚠️ Network error — check your connection';
         errEl.classList.remove('hidden');
         btn.disabled = false;
-        btn.textContent = 'PAY NOW';
+        btn.textContent = '💳 PAY NOW';
     });
 });
+
+function showPaymentSuccess(orderNumber) {
+    document.getElementById('success-order-number').textContent = 'Order: ' + orderNumber;
+    document.getElementById('payment-success-overlay').classList.remove('hidden');
+    document.getElementById('checkout-grid').classList.add('opacity-30', 'pointer-events-none');
+}
 </script>
 <?= $this->endSection() ?>

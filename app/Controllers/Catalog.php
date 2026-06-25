@@ -3,14 +3,23 @@
 namespace App\Controllers;
 
 use App\Models\ProductModel;
+use App\Models\ReviewModel;
+use App\Models\ProductSizeModel;
+use App\Models\ProductImageModel;
 
 class Catalog extends BaseController
 {
     private ProductModel $productModel;
+    private ReviewModel $reviewModel;
+    private ProductSizeModel $sizeModel;
+    private ProductImageModel $productImageModel;
 
     public function __construct()
     {
-        $this->productModel = model('App\Models\ProductModel');
+        $this->productModel      = model('App\Models\ProductModel');
+        $this->reviewModel       = model('App\Models\ReviewModel');
+        $this->sizeModel         = model('App\Models\ProductSizeModel');
+        $this->productImageModel = model('App\Models\ProductImageModel');
     }
 
     public function index()
@@ -31,8 +40,8 @@ class Catalog extends BaseController
         }
 
         return view('catalog/index', [
-            'grouped'    => $grouped,
-            'categories' => $categories,
+            'grouped'     => $grouped,
+            'categories'  => $categories,
             'selectedCat' => $category,
         ]);
     }
@@ -51,9 +60,75 @@ class Catalog extends BaseController
             ->limit(4)
             ->findAll();
 
+        $sizes          = $this->sizeModel->getByProduct($product->id);
+        $reviews        = $this->reviewModel->getByProduct($product->id);
+        $ratingSum      = $this->reviewModel->getRatingSummary($product->id);
+        $galleryImages  = $this->productImageModel->getByProduct($product->id);
+
+        $features = null;
+        if (!empty($product->features)) {
+            $features = json_decode($product->features, true);
+        }
+        $specs = null;
+        if (!empty($product->specifications)) {
+            $specs = json_decode($product->specifications, true);
+        }
+
+        $hasReviewed = false;
+        if (session()->get('isLoggedIn')) {
+            $hasReviewed = $this->reviewModel->hasUserReviewed($product->id, session()->get('user_id'));
+        }
+
         return view('catalog/detail', [
-            'product' => $product,
-            'related' => $related,
+            'product'       => $product,
+            'related'       => $related,
+            'sizes'         => $sizes,
+            'reviews'       => $reviews,
+            'ratingSum'     => $ratingSum,
+            'galleryImages' => $galleryImages,
+            'features'      => $features,
+            'specs'         => $specs,
+            'hasReviewed'   => $hasReviewed,
         ]);
+    }
+
+    public function submitReview()
+    {
+        if (!session()->get('isLoggedIn')) {
+            return redirect()->to('/login')->with('error', 'Please login to submit a review');
+        }
+
+        $rules = [
+            'product_id' => 'required|integer|is_natural_no_zero',
+            'rating'     => 'required|integer|greater_than_equal_to[1]|less_than_equal_to[5]',
+            'review'     => 'permit_empty|min_length[10]',
+        ];
+
+        if (!$this->validate($rules)) {
+            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+        }
+
+        $productId = (int) $this->request->getPost('product_id');
+        $product   = $this->productModel->find($productId);
+
+        if (!$product) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
+
+        $userId = session()->get('user_id');
+
+        if ($this->reviewModel->hasUserReviewed($productId, $userId)) {
+            return redirect()->back()->with('error', 'You have already reviewed this product');
+        }
+
+        $this->reviewModel->insert([
+            'product_id' => $productId,
+            'user_id'    => $userId,
+            'rating'     => (int) $this->request->getPost('rating'),
+            'review'     => $this->request->getPost('review'),
+            'status'     => 'approved',
+        ]);
+
+        return redirect()->back()->with('message', 'Review submitted successfully!');
     }
 }

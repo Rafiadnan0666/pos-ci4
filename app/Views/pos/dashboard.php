@@ -100,7 +100,7 @@
                 </div>
                 <div class="text-right">
                     <p class="font-bold text-sm">Rp <?= number_format($item['price'] * $item['quantity'], 0, ',', '.') ?></p>
-                    <button class="text-xs text-neo-red font-bold mt-1 remove-item" data-id="<?= $id ?>">Remove</button>
+                    <button class="neo-btn-white text-xs !px-2 !py-0.5 mt-1 remove-item" data-id="<?= $id ?>">Remove</button>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -170,18 +170,12 @@ document.getElementById('payment-link-btn')?.addEventListener('click', function 
         if (data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
                 onSuccess: function () {
-                    fetch('<?= base_url('payment/verifyStatus') ?>', {
-                        method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'order_number=' + encodeURIComponent(data.order_number)
-                    }).then(function () {
-                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
-                    }).catch(function () {
-                        window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
-                    });
+                    location.reload();
                 },
                 onPending: function () {
-                    window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number;
+                    alert('Payment is pending. You can check status in orders.');
+                    btn.disabled = false;
+                    btn.textContent = '🔗 QRIS';
                 },
                 onClose: function () {
                     btn.disabled = false;

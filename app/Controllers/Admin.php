@@ -7,6 +7,9 @@ use App\Models\OrderItemModel;
 use App\Models\ProductModel;
 use App\Models\UserModel;
 use App\Models\CategoryModel;
+use App\Models\ReviewModel;
+use App\Models\ProductSizeModel;
+use App\Models\ProductImageModel;
 use App\Libraries\Biteship;
 
 class Admin extends BaseController
@@ -16,14 +19,20 @@ class Admin extends BaseController
     private ProductModel $productModel;
     private UserModel $userModel;
     private CategoryModel $categoryModel;
+    private ReviewModel $reviewModel;
+    private ProductSizeModel $sizeModel;
+    private ProductImageModel $productImageModel;
 
     public function __construct()
     {
-        $this->orderModel     = model('App\Models\OrderModel');
-        $this->orderItemModel = model('App\Models\OrderItemModel');
-        $this->productModel   = model('App\Models\ProductModel');
-        $this->userModel      = model('App\Models\UserModel');
-        $this->categoryModel  = model('App\Models\CategoryModel');
+        $this->orderModel       = model('App\Models\OrderModel');
+        $this->orderItemModel   = model('App\Models\OrderItemModel');
+        $this->productModel     = model('App\Models\ProductModel');
+        $this->userModel        = model('App\Models\UserModel');
+        $this->categoryModel    = model('App\Models\CategoryModel');
+        $this->reviewModel      = model('App\Models\ReviewModel');
+        $this->sizeModel        = model('App\Models\ProductSizeModel');
+        $this->productImageModel = model('App\Models\ProductImageModel');
     }
 
     public function dashboard()
@@ -147,16 +156,35 @@ class Admin extends BaseController
             }
 
             $avatar = $user->avatar;
-            $file = $this->request->getFile('avatar');
-            if ($file && $file->isValid() && in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'], true)) {
-                if ($file->getSize() <= 2 * 1024 * 1024) {
-                    $name = $file->getRandomName();
-                    $file->move(ROOTPATH . 'public/uploads/avatars', $name);
-                    $avatar = 'uploads/avatars/' . $name;
-                    if ($user->avatar && file_exists(ROOTPATH . 'public/' . $user->avatar)) {
-                        @unlink(ROOTPATH . 'public/' . $user->avatar);
+            $file   = $this->request->getFile('avatar');
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+            if ($file && $file->isValid() && $file->getSize() > 0) {
+                if (in_array($file->getMimeType(), $allowedMimes, true)) {
+                    if ($file->getSize() <= 2 * 1024 * 1024) {
+                        $uploadDir = ROOTPATH . 'public/uploads/avatars';
+                        if (!is_dir($uploadDir)) {
+                            @mkdir($uploadDir, 0755, true);
+                        }
+                        $name = $file->getRandomName();
+                        $file->move($uploadDir, $name);
+                        $avatar = 'uploads/avatars/' . $name;
+                        if ($user->avatar && file_exists(ROOTPATH . 'public/' . $user->avatar)) {
+                            @unlink(ROOTPATH . 'public/' . $user->avatar);
+                        }
+                    } else {
+                        return redirect()->back()->withInput()->with('error', 'Avatar image must be under 2MB');
                     }
+                } else {
+                    return redirect()->back()->withInput()->with('error', 'Avatar must be JPG, PNG, WebP, or GIF');
                 }
+            }
+
+            if ($this->request->getPost('remove_avatar')) {
+                if ($user->avatar && file_exists(ROOTPATH . 'public/' . $user->avatar)) {
+                    @unlink(ROOTPATH . 'public/' . $user->avatar);
+                }
+                $avatar = null;
             }
 
             $this->userModel->update($id, [
@@ -167,6 +195,11 @@ class Admin extends BaseController
                 'address' => $this->request->getPost('address') ?: null,
                 'avatar'  => $avatar,
             ]);
+
+            if ($id === (int) session()->get('user_id')) {
+                session()->set('name', $this->request->getPost('name'));
+                session()->set('avatar', $avatar);
+            }
 
             return redirect()->to('/admin/users')->with('message', 'User updated successfully');
         }
@@ -226,10 +259,25 @@ class Admin extends BaseController
         ]);
     }
 
-    private function handleImageUpload($existingImage = null): ?string
+    private function parseKeyValueLines(string $text): array
     {
-        $file = $this->request->getFile('image_file');
+        $lines = explode("\n", trim($text));
+        $result = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            if (str_contains($line, ':')) {
+                $parts = explode(':', $line, 2);
+                $result[trim($parts[0])] = trim($parts[1]);
+            } else {
+                $result[$line] = '';
+            }
+        }
+        return $result;
+    }
 
+    private function uploadImage($file, $existingImage = null): ?string
+    {
         if (!$file || !$file->isValid()) {
             return $existingImage;
         }
@@ -251,13 +299,85 @@ class Admin extends BaseController
         $name = $file->getRandomName();
         $file->move($uploadDir, $name);
 
-        $path = 'uploads/products/' . $name;
+        return 'uploads/products/' . $name;
+    }
 
-        if ($existingImage && file_exists(ROOTPATH . 'public/' . $existingImage)) {
-            @unlink(ROOTPATH . 'public/' . $existingImage);
+    private function handleMainImage($existingImage = null): ?string
+    {
+        $file = $this->request->getFile('image_file');
+        $path = $this->uploadImage($file);
+
+        if ($path && $path !== $existingImage) {
+            if ($existingImage && file_exists(ROOTPATH . 'public/' . $existingImage)) {
+                @unlink(ROOTPATH . 'public/' . $existingImage);
+            }
+            return $path;
         }
 
-        return $path;
+        if ($this->request->getPost('remove_image')) {
+            if ($existingImage && file_exists(ROOTPATH . 'public/' . $existingImage)) {
+                @unlink(ROOTPATH . 'public/' . $existingImage);
+            }
+            return null;
+        }
+
+        return $existingImage;
+    }
+
+    private function handleGalleryUploads(int $productId): void
+    {
+        $files = $this->request->getFiles();
+        if (!isset($files['gallery_images'])) return;
+
+        $galleryFiles = $files['gallery_images'];
+        if (!is_array($galleryFiles)) {
+            $path = $this->uploadImage($galleryFiles);
+            if ($path) {
+                $this->productImageModel->insert([
+                    'product_id' => $productId,
+                    'image'      => $path,
+                    'sort_order' => 0,
+                ]);
+            }
+            return;
+        }
+
+        $sortOrder = 0;
+        foreach ($galleryFiles as $file) {
+            $path = $this->uploadImage($file);
+            if ($path) {
+                $this->productImageModel->insert([
+                    'product_id' => $productId,
+                    'image'      => $path,
+                    'sort_order' => $sortOrder,
+                ]);
+                $sortOrder++;
+            }
+        }
+    }
+
+    private function getProductFormData()
+    {
+        return [
+            'name'              => $this->request->getPost('name'),
+            'description'       => $this->request->getPost('description'),
+            'category'          => $this->request->getPost('category'),
+            'price'             => (float) $this->request->getPost('price'),
+            'stock'             => (int) $this->request->getPost('stock'),
+            'weight_grams'      => (int) $this->request->getPost('weight_grams'),
+            'size'              => $this->request->getPost('size') ?: null,
+            'color'             => $this->request->getPost('color') ?: null,
+            'material'          => $this->request->getPost('material') ?: null,
+            'brand'             => $this->request->getPost('brand') ?: null,
+            'dimension_length'  => $this->request->getPost('dimension_length') ? (int) $this->request->getPost('dimension_length') : null,
+            'dimension_width'   => $this->request->getPost('dimension_width') ? (int) $this->request->getPost('dimension_width') : null,
+            'dimension_height'  => $this->request->getPost('dimension_height') ? (int) $this->request->getPost('dimension_height') : null,
+            'warranty'          => $this->request->getPost('warranty') ?: null,
+            'care_instructions' => $this->request->getPost('care_instructions') ?: null,
+            'features'          => $this->request->getPost('features') ? json_encode(array_map('trim', explode("\n", trim($this->request->getPost('features')))), JSON_UNESCAPED_UNICODE) : null,
+            'specifications'    => $this->request->getPost('specifications') ? json_encode($this->parseKeyValueLines($this->request->getPost('specifications')), JSON_UNESCAPED_UNICODE) : null,
+            'video_url'         => $this->request->getPost('video_url') ?: null,
+        ];
     }
 
     public function createProduct()
@@ -275,6 +395,9 @@ class Admin extends BaseController
                 'size'         => 'permit_empty|max_length[50]',
                 'color'        => 'permit_empty|max_length[50]',
                 'material'     => 'permit_empty|max_length[100]',
+                'brand'        => 'permit_empty|max_length[100]',
+                'warranty'     => 'permit_empty|max_length[100]',
+                'video_url'    => 'permit_empty|valid_url_strict',
             ];
 
             if (!$this->validate($rules)) {
@@ -294,21 +417,16 @@ class Admin extends BaseController
                 $category = $newCat;
             }
 
-            $image = $this->handleImageUpload();
+            $data = $this->getProductFormData();
+            $data['slug'] = $slug;
+            $data['category'] = $category;
+            $data['image'] = $this->handleMainImage();
 
-            $this->productModel->insert([
-                'name'         => $this->request->getPost('name'),
-                'slug'         => $slug,
-                'description'  => $this->request->getPost('description'),
-                'category'     => $category,
-                'price'        => (float) $this->request->getPost('price'),
-                'stock'        => (int) $this->request->getPost('stock'),
-                'weight_grams' => (int) $this->request->getPost('weight_grams'),
-                'size'         => $this->request->getPost('size') ?: null,
-                'color'        => $this->request->getPost('color') ?: null,
-                'material'     => $this->request->getPost('material') ?: null,
-                'image'        => $image,
-            ]);
+            $productId = $this->productModel->insert($data);
+
+            if ($productId) {
+                $this->handleGalleryUploads($productId);
+            }
 
             return redirect()->to('/admin/products')->with('message', 'Product created successfully');
         }
@@ -339,6 +457,9 @@ class Admin extends BaseController
                 'size'         => 'permit_empty|max_length[50]',
                 'color'        => 'permit_empty|max_length[50]',
                 'material'     => 'permit_empty|max_length[100]',
+                'brand'        => 'permit_empty|max_length[100]',
+                'warranty'     => 'permit_empty|max_length[100]',
+                'video_url'    => 'permit_empty|valid_url_strict',
             ];
 
             if (!$this->validate($rules)) {
@@ -351,27 +472,9 @@ class Admin extends BaseController
                 $category = $newCat;
             }
 
-            if ($this->request->getPost('remove_image')) {
-                $image = null;
-                if ($product->image && file_exists(ROOTPATH . 'public/' . $product->image)) {
-                    @unlink(ROOTPATH . 'public/' . $product->image);
-                }
-            } else {
-                $image = $this->handleImageUpload($product->image);
-            }
-
-            $data = [
-                'name'         => $this->request->getPost('name'),
-                'description'  => $this->request->getPost('description'),
-                'category'     => $category,
-                'price'        => (float) $this->request->getPost('price'),
-                'stock'        => (int) $this->request->getPost('stock'),
-                'weight_grams' => (int) $this->request->getPost('weight_grams'),
-                'size'         => $this->request->getPost('size') ?: null,
-                'color'        => $this->request->getPost('color') ?: null,
-                'material'     => $this->request->getPost('material') ?: null,
-                'image'        => $image,
-            ];
+            $data = $this->getProductFormData();
+            $data['category'] = $category;
+            $data['image'] = $this->handleMainImage($product->image);
 
             $newSlug = url_title($this->request->getPost('name'), '-', true);
             $existing = $this->productModel->where('slug', $newSlug)->where('id !=', $id)->first();
@@ -379,12 +482,30 @@ class Admin extends BaseController
 
             $this->productModel->update($id, $data);
 
+            if ($this->request->getPost('remove_gallery')) {
+                $removeIds = explode(',', $this->request->getPost('remove_gallery'));
+                foreach ($removeIds as $rid) {
+                    $img = $this->productImageModel->find((int) $rid);
+                    if ($img && $img->product_id == $id) {
+                        if ($img->image && file_exists(ROOTPATH . 'public/' . $img->image)) {
+                            @unlink(ROOTPATH . 'public/' . $img->image);
+                        }
+                        $this->productImageModel->delete($img->id);
+                    }
+                }
+            }
+
+            $this->handleGalleryUploads($id);
+
             return redirect()->to('/admin/products')->with('message', 'Product updated successfully');
         }
 
+        $galleryImages = $this->productImageModel->getByProduct($id);
+
         return view('admin/product_form', [
-            'product'    => $product,
-            'categories' => $this->productModel->getCategories(),
+            'product'       => $product,
+            'categories'    => $this->productModel->getCategories(),
+            'galleryImages' => $galleryImages,
         ]);
     }
 
@@ -393,6 +514,12 @@ class Admin extends BaseController
         $product = $this->productModel->find($id);
         if (!$product) {
             return $this->response->setJSON(['success' => false, 'error' => 'Not found']);
+        }
+
+        $this->productImageModel->deleteByProduct($id);
+
+        if ($product->image && file_exists(ROOTPATH . 'public/' . $product->image)) {
+            @unlink(ROOTPATH . 'public/' . $product->image);
         }
 
         $this->productModel->delete($id);
@@ -592,6 +719,125 @@ class Admin extends BaseController
         }
 
         log_message('info', "Admin Biteship shipment for order {$order->order_number}: " . json_encode($result));
+    }
+
+    // ─── Review Management ─────────────────────────────────
+
+    public function reviews()
+    {
+        $page    = (int) ($this->request->getGet('page') ?? 1);
+        $reviews = $this->reviewModel->getAllWithProduct(20, $page);
+        $pager   = $this->reviewModel->pager;
+
+        return view('admin/reviews', [
+            'reviews' => $reviews,
+            'pager'   => $pager,
+        ]);
+    }
+
+    public function replyReview(int $id)
+    {
+        $review = $this->reviewModel
+            ->select('product_reviews.*, users.name as user_name, users.avatar as user_avatar')
+            ->join('users', 'users.id = product_reviews.user_id')
+            ->where('product_reviews.id', $id)
+            ->get()
+            ->getRow();
+
+        if (!$review) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
+
+        if ($this->request->getMethod() === 'POST') {
+            $reply = $this->request->getPost('reply');
+            if (empty(trim($reply))) {
+                return redirect()->back()->with('error', 'Reply cannot be empty');
+            }
+
+            $this->reviewModel->update($id, [
+                'reply'      => $reply,
+                'replied_at' => date('Y-m-d H:i:s'),
+                'replied_by' => session()->get('user_id'),
+            ]);
+
+            return redirect()->to('/admin/reviews')->with('message', 'Reply submitted successfully');
+        }
+
+        return view('admin/review_reply', [
+            'review' => $review,
+        ]);
+    }
+
+    public function toggleReviewStatus(int $id)
+    {
+        $review = $this->reviewModel->find($id);
+        if (!$review) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Not found']);
+        }
+
+        $newStatus = $review->status === 'approved' ? 'pending' : 'approved';
+        $this->reviewModel->update($id, ['status' => $newStatus]);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => true, 'status' => $newStatus]);
+        }
+
+        return redirect()->back()->with('message', 'Review status updated');
+    }
+
+    public function deleteReview(int $id)
+    {
+        $review = $this->reviewModel->find($id);
+        if (!$review) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Not found']);
+        }
+
+        $this->reviewModel->delete($id);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => true]);
+        }
+
+        return redirect()->to('/admin/reviews')->with('message', 'Review deleted');
+    }
+
+    // ─── Product Size Management ────────────────────────────
+
+    public function productSizes(int $productId)
+    {
+        $product = $this->productModel->find($productId);
+        if (!$product) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
+
+        if ($this->request->getMethod() === 'POST') {
+            $sizes = $this->request->getPost('sizes');
+
+            $this->sizeModel->deleteByProduct($productId);
+
+            if (!empty($sizes) && is_array($sizes)) {
+                foreach ($sizes as $sizeData) {
+                    if (!empty($sizeData['size']) && isset($sizeData['stock'])) {
+                        $this->sizeModel->insert([
+                            'product_id' => $productId,
+                            'size'       => $sizeData['size'],
+                            'stock'      => (int) $sizeData['stock'],
+                        ]);
+                    }
+                }
+            }
+
+            return redirect()->to('/admin/products')->with('message', 'Sizes updated successfully');
+        }
+
+        $sizes   = $this->sizeModel->getByProduct($productId);
+        $hasSizes = !empty($sizes);
+
+        return view('admin/product_sizes', [
+            'product'  => $product,
+            'sizes'    => $sizes,
+            'hasSizes' => $hasSizes,
+        ]);
     }
 
     public function testApi()

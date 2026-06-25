@@ -36,6 +36,7 @@ class Cart extends BaseController
     {
         $productId = (int) $this->request->getPost('product_id');
         $quantity  = (int) ($this->request->getPost('quantity') ?? 1);
+        $size      = $this->request->getPost('size');
         $product   = $this->productModel->find($productId);
 
         if (!$product) {
@@ -48,14 +49,16 @@ class Cart extends BaseController
 
         $cart = session()->get('buyer_cart') ?? [];
 
-        if (isset($cart[$productId])) {
-            $newQty = $cart[$productId]['quantity'] + $quantity;
+        $cartKey = $productId . ($size ? '-' . $size : '');
+
+        if (isset($cart[$cartKey])) {
+            $newQty = $cart[$cartKey]['quantity'] + $quantity;
             if ($newQty > $product->stock) {
                 return redirect()->back()->with('error', 'Not enough stock available');
             }
-            $cart[$productId]['quantity'] = $newQty;
+            $cart[$cartKey]['quantity'] = $newQty;
         } else {
-            $cart[$productId] = [
+            $cart[$cartKey] = [
                 'product_id' => $product->id,
                 'name'       => $product->name,
                 'price'      => (float) $product->price,
@@ -64,7 +67,7 @@ class Cart extends BaseController
                 'image'      => $product->image,
                 'slug'       => $product->slug,
                 'stock'      => $product->stock,
-                'size'       => $product->size,
+                'size'       => $size ?: $product->size,
                 'color'      => $product->color,
                 'material'   => $product->material,
             ];
@@ -81,22 +84,23 @@ class Cart extends BaseController
             return $this->response->setJSON(['success' => false, 'error' => 'Invalid request']);
         }
 
-        $productId = (int) $this->request->getPost('product_id');
+        $cartKey = $this->request->getPost('product_id');
+        $cartKey = $this->request->getPost('cart_key') ?: $cartKey;
         $quantity  = (int) $this->request->getPost('quantity');
         $cart      = session()->get('buyer_cart') ?? [];
 
-        if (!isset($cart[$productId])) {
+        if (!isset($cart[$cartKey])) {
             return $this->response->setJSON(['success' => false, 'error' => 'Item not in cart']);
         }
 
         if ($quantity < 1) {
-            unset($cart[$productId]);
+            unset($cart[$cartKey]);
         } else {
-            $product = $this->productModel->find($productId);
+            $product = $this->productModel->find($cart[$cartKey]['product_id']);
             if ($product && $quantity > $product->stock) {
                 return $this->response->setJSON(['success' => false, 'error' => 'Not enough stock']);
             }
-            $cart[$productId]['quantity'] = $quantity;
+            $cart[$cartKey]['quantity'] = $quantity;
         }
 
         session()->set('buyer_cart', $cart);
@@ -119,11 +123,15 @@ class Cart extends BaseController
 
     public function remove()
     {
+        $cartKey = $this->request->getPost('cart_key');
         $productId = (int) $this->request->getPost('product_id');
-        $cart      = session()->get('buyer_cart') ?? [];
+        if (!$cartKey && $productId) {
+            $cartKey = (string) $productId;
+        }
+        $cart = session()->get('buyer_cart') ?? [];
 
-        if (isset($cart[$productId])) {
-            unset($cart[$productId]);
+        if ($cartKey && isset($cart[$cartKey])) {
+            unset($cart[$cartKey]);
         }
 
         session()->set('buyer_cart', $cart);

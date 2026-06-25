@@ -15,6 +15,7 @@ $routes->get('/logout', 'AuthController::logout');
 $routes->get('/', 'Catalog::index');
 $routes->get('/products', 'Catalog::index');
 $routes->get('product/(:any)', 'Catalog::detail/$1');
+$routes->post('product/review', 'Catalog::submitReview');
 
 // Cart - public
 $routes->get('cart', 'Cart::index');
@@ -71,10 +72,21 @@ $routes->post('admin/categories/create', 'Admin::createCategory', ['filter' => '
 $routes->get('admin/categories/edit/(:num)', 'Admin::editCategory/$1', ['filter' => 'auth:owner']);
 $routes->post('admin/categories/edit/(:num)', 'Admin::editCategory/$1', ['filter' => 'auth:owner']);
 $routes->post('admin/categories/delete/(:num)', 'Admin::deleteCategory/$1', ['filter' => 'auth:owner']);
+$routes->get('admin/reviews', 'Admin::reviews', ['filter' => 'auth:owner']);
+$routes->get('admin/reviews/reply/(:num)', 'Admin::replyReview/$1', ['filter' => 'auth:owner']);
+$routes->post('admin/reviews/reply/(:num)', 'Admin::replyReview/$1', ['filter' => 'auth:owner']);
+$routes->post('admin/reviews/toggle-status/(:num)', 'Admin::toggleReviewStatus/$1', ['filter' => 'auth:owner']);
+$routes->post('admin/reviews/delete/(:num)', 'Admin::deleteReview/$1', ['filter' => 'auth:owner']);
+$routes->get('admin/products/sizes/(:num)', 'Admin::productSizes/$1', ['filter' => 'auth:owner']);
+$routes->post('admin/products/sizes/(:num)', 'Admin::productSizes/$1', ['filter' => 'auth:owner']);
 $routes->get('admin/test-api', 'Admin::testApi', ['filter' => 'auth:owner']);
 
 // Order History (buyer)
 $routes->get('orders', 'OrderController::myOrders', ['filter' => 'auth']);
+
+// Profile
+$routes->get('profile', 'Profile::index', ['filter' => 'auth']);
+$routes->post('profile/update', 'Profile::update', ['filter' => 'auth']);
 
 // Midtrans Webhook (unauthenticated - called by Midtrans server)
 $routes->post('midtrans/callback', 'MidtransCallback::index');

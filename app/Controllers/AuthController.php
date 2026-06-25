@@ -44,6 +44,7 @@ class AuthController extends BaseController
             'name'       => $user->name,
             'email'      => $user->email,
             'role'       => $user->role,
+            'avatar'     => $user->avatar,
         ];
 
         session()->set($sessionData);
@@ -98,6 +99,7 @@ class AuthController extends BaseController
             'name'       => $this->request->getPost('name'),
             'email'      => $this->request->getPost('email'),
             'role'       => 'buyer',
+            'avatar'     => null,
         ];
 
         session()->set($sessionData);

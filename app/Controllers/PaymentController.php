@@ -217,6 +217,7 @@ class PaymentController extends BaseController
             $orderItemModel->insert([
                 'order_id'   => $orderId,
                 'product_id' => $item['product_id'],
+                'size'       => $item['size'] ?? null,
                 'quantity'   => $item['quantity'],
                 'price'      => $item['price'],
                 'subtotal'   => $item['price'] * $item['quantity'],

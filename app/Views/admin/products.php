@@ -61,22 +61,24 @@
                                     <?= $p->stock ?> left
                                 </span>
                             </div>
-                            <div class="flex items-center gap-2 mt-2">
+                            <div class="flex items-center gap-2 mt-2 flex-wrap">
                                 <span class="text-xs opacity-60"><?= $p->weight_grams ?>g</span>
                                 <?php if (!empty($p->size)): ?><span class="text-xs opacity-60">📏 <?= esc($p->size) ?></span><?php endif; ?>
                                 <?php if (!empty($p->color)): ?><span class="text-xs opacity-60">🎨 <?= esc($p->color) ?></span><?php endif; ?>
                                 <?php if (!empty($p->material)): ?><span class="text-xs opacity-60">🧵 <?= esc($p->material) ?></span><?php endif; ?>
+                                <?php if (!empty($p->brand)): ?><span class="text-xs opacity-60">🏷️ <?= esc($p->brand) ?></span><?php endif; ?>
                                 <?php if ($p->image): ?>
                                 <span class="text-xs opacity-60">🖼️</span>
                                 <?php endif; ?>
                             </div>
                         </div>
                     </div>
-                    <div class="flex gap-2 mt-4 pt-3 border-t-2 border-black">
-                        <a href="<?= base_url('admin/products/edit/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5 flex-1 text-center">✏️ Edit</a>
-                        <form action="<?= base_url('admin/products/delete/' . $p->id) ?>" method="POST" onsubmit="return confirm('Delete <?= esc($p->name, 'js') ?>?')" class="flex-1">
+                    <div class="flex gap-2 mt-4 pt-3 border-t-2 border-black flex-wrap">
+                        <a href="<?= base_url('admin/products/edit/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5 text-center">✏️ Edit</a>
+                        <a href="<?= base_url('admin/products/sizes/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5 text-center">📏 Sizes</a>
+                        <form action="<?= base_url('admin/products/delete/' . $p->id) ?>" method="POST" onsubmit="return confirm('Delete <?= esc($p->name, 'js') ?>?')" class="inline">
                             <?= csrf_field() ?>
-                            <button type="submit" class="neo-btn-white text-xs !px-3 !py-1.5 w-full text-center hover:!bg-[#EF4444] hover:!text-white">🗑️ Delete</button>
+                            <button type="submit" class="neo-btn-white text-xs !px-3 !py-1.5 hover:!bg-[#EF4444] hover:!text-white">🗑️ Delete</button>
                         </form>
                     </div>
                 </div>

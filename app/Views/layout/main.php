@@ -21,6 +21,7 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet" />
+    <?= $this->renderSection('styles') ?>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>" />
     <style>
         body { font-family: Inter, system-ui, sans-serif; background-color: #F4F2EE; color: #000; }
@@ -81,8 +82,17 @@
                 <a href="<?= base_url('admin/dashboard') ?>" class="neo-btn-cyan text-xs !px-3 !py-1.5">Admin</a>
                 <a href="<?= base_url('admin/products') ?>" class="neo-btn-white text-xs !px-3 !py-1.5">Products</a>
                 <a href="<?= base_url('admin/categories') ?>" class="neo-btn-white text-xs !px-3 !py-1.5">Categories</a>
+                <a href="<?= base_url('admin/reviews') ?>" class="neo-btn-white text-xs !px-3 !py-1.5">Reviews</a>
                 <a href="<?= base_url('pos') ?>" class="neo-btn-white text-xs !px-3 !py-1.5">POS</a>
                 <?php endif; ?>
+                <a href="<?= base_url('profile') ?>" class="neo-btn-white text-xs !px-3 !py-1.5">Profile</a>
+                <div class="w-8 h-8 border-2 border-black flex items-center justify-center font-bold text-xs overflow-hidden <?= session('avatar') ? '' : 'bg-[#FFDE4D]' ?>">
+                    <?php if (session('avatar')): ?>
+                    <img src="<?= base_url(session('avatar')) ?>" class="w-full h-full object-cover" alt="" />
+                    <?php else: ?>
+                    <?= strtoupper(substr(session('name'), 0, 1)) ?>
+                    <?php endif; ?>
+                </div>
                 <span class="font-bold text-xs"><?= session()->get('name') ?></span>
                 <a href="<?= base_url('logout') ?>" class="neo-btn-red text-xs !px-3 !py-1.5">Logout</a>
                 <?php else: ?>

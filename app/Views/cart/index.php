@@ -48,8 +48,8 @@
                     </div>
                 </div>
                 <form action="<?= base_url('cart/remove') ?>" method="POST">
-                    <input type="hidden" name="product_id" value="<?= $id ?>" />
-                    <button type="submit" class="text-neo-red font-bold text-sm">✕</button>
+                    <input type="hidden" name="cart_key" value="<?= $id ?>" />
+                    <button type="submit" class="neo-btn-white text-xs !px-2 !py-1">✕</button>
                 </form>
             </div>
             <?php endforeach; ?>
@@ -101,7 +101,7 @@ document.querySelectorAll('.qty-inc, .qty-dec').forEach(btn => {
         fetch('<?= base_url('cart/update') ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-            body: new URLSearchParams({ product_id: id, quantity: qty })
+            body: new URLSearchParams({ cart_key: id, quantity: qty })
         })
         .then(r => r.json())
         .then(data => {
