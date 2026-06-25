@@ -86,22 +86,37 @@ class Biteship
 
         $result = $this->request('POST', '/rates/couriers', $payload);
 
+        log_message('info', 'Biteship rates request payload: ' . json_encode($payload));
+        log_message('info', 'Biteship rates response: ' . json_encode($result));
+
         if (!$result['success']) {
-            return ['success' => false, 'error' => $result['data']['error'] ?? 'Failed to get rates'];
+            $errMsg = $result['data']['error'] ?? $result['data']['message'] ?? 'Failed to get rates';
+            if (!empty($result['data'])) {
+                $errMsg .= ' | ' . json_encode($result['data']);
+            }
+            return ['success' => false, 'error' => $errMsg];
         }
 
         $pricing = $result['data']['pricing'] ?? [];
 
+        if (empty($pricing)) {
+            return ['success' => false, 'error' => 'No courier rates found for this destination. Try a different postal code.'];
+        }
+
         $rates = [];
         foreach ($pricing as $rate) {
+            $durationRange = $rate['shipment_duration_range'] ?? '';
+            $durationUnit  = $rate['shipment_duration_unit'] ?? 'days';
+            $durationText  = $durationRange ? "{$durationRange} {$durationUnit}" : '';
+
             $rates[] = [
-                'courier_name'    => $rate['courier_name'] ?? '',
-                'courier_code'    => $rate['courier_code'] ?? '',
-                'service_name'    => $rate['service_name'] ?? '',
-                'service_code'    => $rate['service_code'] ?? '',
-                'shipping_fee'    => (int) ($rate['price'] ?? 0),
-                'duration'        => $rate['duration'] ?? '',
-                'duration_text'   => $rate['duration_text'] ?? '',
+                'courier_name'    => $rate['courier_name'] ?? $rate['company'] ?? '',
+                'courier_code'    => $rate['courier_code'] ?? $rate['company'] ?? '',
+                'service_name'    => $rate['courier_service_name'] ?? $rate['service_name'] ?? '',
+                'service_code'    => $rate['courier_service_code'] ?? $rate['service_code'] ?? '',
+                'shipping_fee'    => (int) ($rate['shipping_fee'] ?? $rate['price'] ?? 0),
+                'duration'        => $durationRange,
+                'duration_text'   => $durationText,
             ];
         }
 

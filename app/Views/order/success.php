@@ -98,6 +98,11 @@
     </div>
 
     <div class="text-center space-x-3">
+        <?php if ($order->payment_status === 'pending'): ?>
+        <button id="pay-now-success" class="neo-btn-green" data-order="<?= $order->order_number ?>">
+            💳 Pay Now (Rp <?= number_format($order->gross_amount, 0, ',', '.') ?>)
+        </button>
+        <?php endif; ?>
         <a href="<?= base_url('/') ?>" class="neo-btn-yellow">Continue Shopping</a>
         <a href="<?= base_url('orders') ?>" class="neo-btn-white">My Orders</a>
     </div>
@@ -108,13 +113,50 @@
     <p class="font-bold">
         💡 If you paid with QRIS (GoPay/Dana) in sandbox mode, payments are simulated.
     </p>
-    <button id="simulate-payment" class="neo-btn-yellow !text-black mt-2 text-sm" data-order="<?= $order->order_number ?>">
-        ⚡ Simulate Payment (Sandbox Only)
-    </button>
+    <div class="flex items-center justify-center gap-3 mt-2 flex-wrap">
+        <button id="simulate-payment" class="neo-btn-yellow !text-black text-sm" data-order="<?= $order->order_number ?>">
+            ⚡ Simulate Payment (Sandbox Only)
+        </button>
+        <button id="pay-now-success-2" class="neo-btn-green text-sm" data-order="<?= $order->order_number ?>">
+            💳 Retry Payment
+        </button>
+    </div>
     <p class="text-xs mt-2 opacity-80">This simulates a successful Midtrans settlement for testing.</p>
 </div>
 
 <script>
+function payNow(orderNumber, btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = 'Loading...';
+    fetch('<?= base_url('payment/getPayToken') ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'order_number=' + encodeURIComponent(orderNumber)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success && data.snap_token) {
+            window.snap.pay(data.snap_token, {
+                onSuccess: function() { location.reload(); },
+                onPending: function() { alert('Payment is pending.'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; },
+                onError: function() { alert('Payment error'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; },
+                onClose: function() { btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; }
+            });
+        } else {
+            alert(data.error || 'Failed to load payment');
+            btnEl.disabled = false;
+            btnEl.textContent = '💳 Pay Now';
+        }
+    })
+    .catch(function() {
+        alert('Network error');
+        btnEl.disabled = false;
+        btnEl.textContent = '💳 Pay Now';
+    });
+}
+document.querySelectorAll('[id^="pay-now-success"]').forEach(function(btn) {
+    btn.addEventListener('click', function() { payNow(this.dataset.order, this); });
+});
 document.getElementById('simulate-payment')?.addEventListener('click', function() {
     const btn = this;
     btn.disabled = true;

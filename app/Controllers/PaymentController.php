@@ -273,4 +273,76 @@ class PaymentController extends BaseController
             'redirect_url' => $result['redirect_url'],
         ]);
     }
+
+    public function getPayToken()
+    {
+        $orderNumber = $this->request->getPost('order_number');
+        if (!$orderNumber) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Missing order number']);
+        }
+
+        $order = $this->orderModel->where('order_number', $orderNumber)->first();
+        if (!$order) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Order not found']);
+        }
+
+        if ($order->payment_status === 'settlement') {
+            return $this->response->setJSON(['success' => false, 'error' => 'Order already settled']);
+        }
+
+        if ($order->midtrans_snap_token) {
+            // Return existing token — Midtrans snap tokens are valid for the transaction duration
+            return $this->response->setJSON([
+                'success'    => true,
+                'snap_token' => $order->midtrans_snap_token,
+            ]);
+        }
+
+        // No existing token — regenerate (shouldn't normally happen)
+        $items = $this->orderItemModel->getByOrderId($order->id);
+        $midtransItems = [];
+        foreach ($items as $item) {
+            $midtransItems[] = [
+                'id'       => (string) $item->product_id,
+                'price'    => (int) $item->price,
+                'quantity' => (int) $item->quantity,
+                'name'     => $item->name ?? "Item #{$item->product_id}",
+            ];
+        }
+        if ($order->shipping_cost > 0) {
+            $midtransItems[] = [
+                'id'       => 'SHIPPING',
+                'price'    => (int) $order->shipping_cost,
+                'quantity' => 1,
+                'name'     => 'Shipping (' . ($order->courier_name ?? '') . ' - ' . ($order->courier_service ?? '') . ')',
+            ];
+        }
+
+        $result = $this->midtrans->createSnapToken([
+            'order_id'     => $order->order_number,
+            'gross_amount' => (int) $order->gross_amount,
+            'customer' => [
+                'name'  => $order->buyer_name ?? session()->get('name'),
+                'email' => $order->buyer_email ?? session()->get('email'),
+                'phone' => $order->buyer_phone ?? '',
+            ],
+            'items' => $midtransItems,
+        ]);
+
+        if (!$result['success']) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error'   => $result['error'] ?? 'Failed to create payment token',
+            ]);
+        }
+
+        $this->orderModel->update($order->id, [
+            'midtrans_snap_token' => $result['token'],
+        ]);
+
+        return $this->response->setJSON([
+            'success'    => true,
+            'snap_token' => $result['token'],
+        ]);
+    }
 }

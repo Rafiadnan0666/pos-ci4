@@ -227,8 +227,13 @@ document.getElementById('get-rates').addEventListener('click', function () {
         document.getElementById('rates-loading').classList.add('hidden');
         btn.disabled = false;
 
-        if (!data.success || !data.rates || data.rates.length === 0) {
-            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">No rates found for the selected couriers.</p>';
+        if (!data.success) {
+            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">⚠️ ' + (data.error || 'No rates found for the selected couriers.') + '</p>';
+            return;
+        }
+
+        if (!data.rates || data.rates.length === 0) {
+            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">⚠️ No courier rates available for this destination. Try a different postal code.</p>';
             return;
         }
 
@@ -238,7 +243,7 @@ document.getElementById('get-rates').addEventListener('click', function () {
     .catch(function () {
         document.getElementById('rates-loading').classList.add('hidden');
         btn.disabled = false;
-        document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">Failed to fetch rates. Try again.</p>';
+        document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">⚠️ Network error — check your connection and try again.</p>';
     });
 });
 

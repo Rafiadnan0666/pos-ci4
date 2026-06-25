@@ -32,6 +32,7 @@ $routes->post('shipping/getRates', 'ShippingController::getRates', ['filter' => 
 $routes->post('payment/createTransaction', 'PaymentController::createTransaction', ['filter' => 'auth:buyer']);
 $routes->post('payment/verifyStatus', 'PaymentController::verifyStatus', ['filter' => 'auth']);
 $routes->post('payment/simulatePayment', 'PaymentController::simulatePayment', ['filter' => 'auth']);
+$routes->post('payment/getPayToken', 'PaymentController::getPayToken', ['filter' => 'auth']);
 
 // Orders - requires login
 $routes->get('order/success/(:any)', 'OrderController::success/$1', ['filter' => 'auth']);

@@ -64,6 +64,63 @@
         </div>
     </div>
 
+    <?php if ($order->payment_status === 'pending'): ?>
+    <div class="text-center space-x-3">
+        <button id="pay-now-btn" class="neo-btn-green" data-order="<?= $order->order_number ?>">
+            💳 Pay Now (Rp <?= number_format($order->gross_amount, 0, ',', '.') ?>)
+        </button>
+        <a href="<?= base_url('/') ?>" class="neo-btn-yellow">Back to Store</a>
+    </div>
+    <?php else: ?>
     <a href="<?= base_url('/') ?>" class="neo-btn-yellow">Back to Store</a>
+    <?php endif; ?>
 </div>
+
+<?php if ($order->payment_status === 'pending'): ?>
+<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="<?= trim(env('MIDTRANS_CLIENT_KEY', '')) ?>"></script>
+<script>
+document.getElementById('pay-now-btn')?.addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+
+    fetch('<?= base_url('payment/getPayToken') ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'order_number=' + encodeURIComponent(this.dataset.order)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success && data.snap_token) {
+            window.snap.pay(data.snap_token, {
+                onSuccess: function() {
+                    location.reload();
+                },
+                onPending: function() {
+                    alert('Payment is pending. Please complete your payment.');
+                },
+                onError: function(result) {
+                    alert('Payment error: ' + (result.status_message || 'Unknown error'));
+                    btn.disabled = false;
+                    btn.textContent = '💳 Pay Now';
+                },
+                onClose: function() {
+                    btn.disabled = false;
+                    btn.textContent = '💳 Pay Now';
+                }
+            });
+        } else {
+            alert(data.error || 'Failed to load payment');
+            btn.disabled = false;
+            btn.textContent = '💳 Pay Now';
+        }
+    })
+    .catch(function() {
+        alert('Network error');
+        btn.disabled = false;
+        btn.textContent = '💳 Pay Now';
+    });
+});
+</script>
+<?php endif; ?>
 <?= $this->endSection() ?>
