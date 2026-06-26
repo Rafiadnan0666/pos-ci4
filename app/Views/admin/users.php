@@ -26,8 +26,8 @@
                     <?php endif; ?>
                 </div>
                 <div>
-                    <h3 class="font-heading font-bold"><?= $u->name ?></h3>
-                    <p class="text-xs opacity-60"><?= $u->email ?></p>
+                    <h3 class="font-heading font-bold"><?= esc($u->name) ?></h3>
+                    <p class="text-xs opacity-60"><?= esc($u->email) ?></p>
                 </div>
             </div>
             <div class="flex items-center gap-4">

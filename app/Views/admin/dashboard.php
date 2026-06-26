@@ -47,8 +47,8 @@
             <?php foreach ($lowStock as $p): ?>
             <div class="flex items-center gap-3 text-sm text-white">
                 <span class="neo-badge bg-white text-black font-bold"><?= $p->stock ?> left</span>
-                <span class="font-bold"><?= $p->name ?></span>
-                <span class="opacity-70">(<?= $p->category ?>)</span>
+                <span class="font-bold"><?= esc($p->name) ?></span>
+                <span class="opacity-70">(<?= esc($p->category) ?>)</span>
             </div>
             <?php endforeach; ?>
         </div>
@@ -68,8 +68,8 @@
                     <?php foreach ($recentOrders as $o): ?>
                     <a href="<?= base_url('admin/order/' . $o->order_number) ?>" class="flex items-center justify-between p-3 border-2 border-black hover:bg-[#FFDE4D] transition-colors no-underline text-black">
                         <div>
-                            <span class="font-bold text-sm font-mono"><?= $o->order_number ?></span>
-                            <span class="text-xs ml-2 opacity-60"><?= $o->buyer_name ?></span>
+                            <span class="font-bold text-sm font-mono"><?= esc($o->order_number) ?></span>
+                            <span class="text-xs ml-2 opacity-60"><?= esc($o->buyer_name) ?></span>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="font-bold text-sm">Rp <?= number_format($o->gross_amount, 0, ',', '.') ?></span>
@@ -104,7 +104,7 @@
                 <div class="space-y-3">
                     <?php foreach ($ordersByStatus as $s): ?>
                     <?php $c = $statusColors[$s->payment_status] ?? ['bg' => '#9CA3AF', 'text' => '#fff']; ?>
-                    <a href="<?= base_url('admin/orders?status=' . $s->payment_status) ?>" class="flex items-center justify-between p-3 border-2 border-black no-underline text-black" style="background:<?= $c['bg'] ?>;color:<?= $c['text'] ?>">
+                    <a href="<?= base_url('admin/orders?status=' . $s->payment_status) ?>" class="flex items-center justify-between p-3 border-2 border-black no-underline" style="background:<?= $c['bg'] ?>;color:<?= $c['text'] ?>">
                         <span class="font-bold text-sm uppercase"><?= $s->payment_status ?></span>
                         <span class="font-black text-lg"><?= $s->count ?></span>
                     </a>

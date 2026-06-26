@@ -10,7 +10,7 @@
                 <div class="bg-gray-100 border-4 border-black h-80 flex items-center justify-center text-8xl overflow-hidden relative" id="main-image-container">
                     <?php $catIcons = ['Tents' => '⛺', 'Packs' => '🎒', 'Apparel' => '🧥', 'Cooking' => '🍳']; ?>
                     <?php if ($product->image): ?>
-                    <img id="main-product-image" src="<?= base_url($product->image) ?>" alt="<?= $product->name ?>" class="w-full h-full object-cover" />
+                    <img id="main-product-image" src="<?= base_url($product->image) ?>" alt="<?= esc($product->name) ?>" class="w-full h-full object-cover" />
                     <?php else: ?>
                     <?= $catIcons[$product->category] ?? '📦' ?>
                     <?php endif; ?>
@@ -39,8 +39,8 @@
             <?php if (!empty($product->brand)): ?>
             <span class="neo-badge bg-black text-white text-[10px] mb-2 inline-block"><?= strtoupper(esc($product->brand)) ?></span>
             <?php endif; ?>
-            <span class="neo-badge bg-black text-white"><?= strtoupper($product->category) ?></span>
-            <h1 class="text-3xl md:text-4xl font-black mt-3"><?= $product->name ?></h1>
+            <span class="neo-badge bg-black text-white"><?= strtoupper(esc($product->category)) ?></span>
+            <h1 class="text-3xl md:text-4xl font-black mt-3"><?= esc($product->name) ?></h1>
 
             <div class="flex flex-wrap items-center gap-2 mt-3 text-sm">
                 <?php if ($ratingSum->total > 0): ?>
@@ -57,17 +57,40 @@
                 </span>
             </div>
 
-            <div class="text-4xl font-black mt-4">Rp <?= number_format($product->price, 0, ',', '.') ?></div>
+            <div class="text-4xl font-black mt-4" id="product-price">Rp <?= number_format($product->price, 0, ',', '.') ?></div>
 
             <div class="neo-divider my-4"></div>
 
-            <p class="text-sm leading-relaxed"><?= $product->description ?></p>
+            <p class="text-sm leading-relaxed"><?= esc($product->description) ?></p>
 
             <div class="neo-divider my-4"></div>
 
-            <?php if (!empty($sizes)): ?>
+            <!-- ====== ADVANCED VARIANT SELECTOR ====== -->
+            <?php if (!empty($variantAttrs)): ?>
+            <div id="variant-selector" data-base-price="<?= $product->price ?>">
+                <?php foreach ($variantAttrs as $attrName => $attrValues): ?>
+                <div class="mb-4">
+                    <p class="font-bold text-sm mb-2"><?= esc(ucfirst($attrName)) ?>:</p>
+                    <div class="flex flex-wrap gap-2" data-attr-name="<?= esc($attrName) ?>">
+                        <?php foreach ($attrValues as $val): ?>
+                        <button type="button"
+                            class="variant-attr-btn neo-btn-white text-xs !px-4 !py-2"
+                            data-attr-name="<?= esc($attrName) ?>"
+                            data-attr-value="<?= esc($val) ?>">
+                            <?= esc($val) ?>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <input type="hidden" name="variant_id" id="selected-variant-id" value="" />
+                <p id="variant-error" class="text-[#EF4444] text-xs font-bold mt-1 hidden">Please select all attributes</p>
+                <p id="variant-stock-info" class="text-xs font-bold mt-1 hidden"></p>
+            </div>
+            <?php elseif (!empty($sizes)): ?>
+            <!-- ====== SIMPLE SIZE SELECTOR (fallback) ====== -->
             <div class="mb-4">
-                <p class="font-bold text-sm mb-2">Available Sizes:</p>
+                <p class="font-bold text-sm mb-2">Size:</p>
                 <div class="flex flex-wrap gap-2" id="size-selector">
                     <?php foreach ($sizes as $s): ?>
                     <button type="button"
@@ -86,10 +109,12 @@
             <?php endif; ?>
 
             <form action="<?= base_url('cart/add') ?>" method="POST" class="flex items-center gap-3" id="add-to-cart-form">
+                <?= csrf_field() ?>
                 <input type="hidden" name="product_id" value="<?= $product->id ?>" />
                 <input type="hidden" name="size" id="cart-size" value="" />
+                <input type="hidden" name="variant_id" id="cart-variant-id" value="" />
                 <div class="flex items-center border-4 border-black">
-                    <button type="button" class="px-3 py-2 font-bold text-lg neo-btn-white !border-0 !shadow-none !rounded-none" onclick="this.nextElementSibling.stepDown();updateStockInfo()">-</button>
+                    <button type="button" class="px-3 py-2 font-bold text-lg neo-btn-white !border-0 !shadow-none !rounded-none" onclick="this.nextElementSibling.stepDown();updateStockInfo()">−</button>
                     <input type="number" name="quantity" id="qty-input" value="1" min="1" max="<?= $product->stock ?>" class="w-16 text-center font-bold border-x-4 border-black py-2" />
                     <button type="button" class="px-3 py-2 font-bold text-lg neo-btn-white !border-0 !shadow-none !rounded-none" onclick="this.previousElementSibling.stepUp();updateStockInfo()">+</button>
                 </div>
@@ -128,6 +153,43 @@
                         <td class="py-2 px-3">
                             <span class="neo-badge text-[10px] <?= $s->stock > 0 ? 'bg-[#22C55E]' : 'bg-[#EF4444] text-white' ?>">
                                 <?= $s->stock > 0 ? 'Available' : 'Out of Stock' ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($variants)): ?>
+    <div class="neo-card mb-8" data-aos="fade-up">
+        <h2 class="text-xl font-black mb-4">🎨 ALL VARIANT COMBINATIONS</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b-4 border-black">
+                        <th class="py-2 px-3 font-black text-sm">Attributes</th>
+                        <th class="py-2 px-3 font-black text-sm">Price</th>
+                        <th class="py-2 px-3 font-black text-sm">Stock</th>
+                        <th class="py-2 px-3 font-black text-sm">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($variants as $v):
+                        $vAttrs = json_decode($v->attributes, true) ?? [];
+                        $attrParts = [];
+                        foreach ($vAttrs as $an => $av) { $attrParts[] = esc($an) . ': ' . esc($av); }
+                        $vPrice = $v->price ? (float) $v->price : (float) $product->price;
+                    ?>
+                    <tr class="border-b-2 border-black">
+                        <td class="py-2 px-3 font-bold text-sm"><?= implode(' | ', $attrParts) ?></td>
+                        <td class="py-2 px-3">Rp <?= number_format($vPrice, 0, ',', '.') ?></td>
+                        <td class="py-2 px-3"><?= $v->stock ?></td>
+                        <td class="py-2 px-3">
+                            <span class="neo-badge text-[10px] <?= $v->stock > 0 ? 'bg-[#22C55E]' : 'bg-[#EF4444] text-white' ?>">
+                                <?= $v->stock > 0 ? 'Available' : 'Out of Stock' ?>
                             </span>
                         </td>
                     </tr>
@@ -321,6 +383,13 @@
         </div>
         <?php else: ?>
         <h3 class="font-black text-lg mb-3">✍️ Write a Review</h3>
+        <?php if (session()->has('review_errors')): ?>
+        <div class="bg-[#EF4444] text-white border-4 border-black p-3 mb-4 text-sm font-bold">
+            <?php foreach (session('review_errors') as $e): ?>
+            <div>⚠️ <?= $e ?></div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <form action="<?= base_url('product/review') ?>" method="POST">
             <?= csrf_field() ?>
             <input type="hidden" name="product_id" value="<?= $product->id ?>" />
@@ -337,7 +406,7 @@
 
             <div class="mb-3">
                 <label class="block font-bold text-sm mb-1">Your Review</label>
-                <textarea name="review" rows="4" class="neo-input" placeholder="Share your experience with this product (min 10 characters)..."><?= old('review') ?></textarea>
+                <textarea name="review" rows="4" class="neo-input" placeholder="Share your experience with this product (min 10 characters)..."><?= esc(old('review')) ?></textarea>
             </div>
 
             <button type="submit" class="neo-btn-cyan">Submit Review</button>
@@ -359,7 +428,7 @@
             <a href="<?= base_url('product/' . $r->slug) ?>" class="neo-card hover:bg-neo-yellow transition-colors">
                 <div class="bg-gray-100 border-2 border-black h-24 flex items-center justify-center text-3xl mb-2 overflow-hidden">
                     <?php if ($r->image): ?>
-                    <img src="<?= base_url($r->image) ?>" alt="<?= $r->name ?>" class="w-full h-full object-cover" />
+                    <img src="<?= base_url($r->image) ?>" alt="<?= esc($r->name) ?>" class="w-full h-full object-cover" />
                     <?php else: ?>
                     <?= $catIcons[$r->category] ?? '📦' ?>
                     <?php endif; ?>
@@ -367,7 +436,7 @@
                 <?php if (!empty($r->brand)): ?>
                 <p class="text-[10px] font-bold opacity-60"><?= esc($r->brand) ?></p>
                 <?php endif; ?>
-                <h3 class="font-heading font-bold text-xs uppercase leading-tight"><?= $r->name ?></h3>
+                <h3 class="font-heading font-bold text-xs uppercase leading-tight"><?= esc($r->name) ?></h3>
                 <p class="font-bold text-sm mt-1">Rp <?= number_format($r->price, 0, ',', '.') ?></p>
             </a>
             <?php endforeach; ?>
@@ -380,6 +449,10 @@
 
 <?= $this->section('scripts') ?>
 <script>
+// Store variants as JS array
+const variants = <?= json_encode($variants) ?>;
+const variantAttrs = <?= json_encode($variantAttrs) ?>;
+
 // Gallery thumbnails
 document.querySelectorAll('.gallery-thumb').forEach(function(thumb) {
     thumb.addEventListener('click', function() {
@@ -403,7 +476,76 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     });
 });
 
-// Size selector
+// Variant selector (advanced)
+function initVariantSelector() {
+    const attrGroups = document.querySelectorAll('[data-attr-name]');
+    const selectedVariantId = document.getElementById('selected-variant-id');
+    const cartVariantId = document.getElementById('cart-variant-id');
+    const qtyInput = document.getElementById('qty-input');
+    const variantError = document.getElementById('variant-error');
+    const stockInfo = document.getElementById('variant-stock-info');
+    const priceDisplay = document.getElementById('product-price');
+    const basePrice = parseFloat(document.getElementById('variant-selector')?.dataset?.basePrice || 0);
+
+    function getSelectedAttributes() {
+        const attrs = {};
+        document.querySelectorAll('.variant-attr-btn.selected').forEach(function(btn) {
+            attrs[btn.dataset.attrName] = btn.dataset.attrValue;
+        });
+        return attrs;
+    }
+
+    function findMatchingVariant() {
+        const selected = getSelectedAttributes();
+        const totalAttrs = Object.keys(variantAttrs).length;
+        if (Object.keys(selected).length < totalAttrs) return null;
+
+        for (let v of variants) {
+            const vAttrs = JSON.parse(v.attributes);
+            let match = true;
+            for (let key in selected) {
+                if (vAttrs[key] !== selected[key]) { match = false; break; }
+            }
+            if (match) return v;
+        }
+        return null;
+    }
+
+    function updateVariantDisplay() {
+        const variant = findMatchingVariant();
+        if (variant) {
+            selectedVariantId.value = variant.id;
+            cartVariantId.value = variant.id;
+            const vPrice = variant.price ? parseFloat(variant.price) : basePrice;
+            priceDisplay.textContent = 'Rp ' + vPrice.toLocaleString('id-ID');
+            qtyInput.max = variant.stock;
+            if (parseInt(qtyInput.value) > variant.stock) qtyInput.value = variant.stock;
+            stockInfo.textContent = '✅ ' + variant.stock + ' units available';
+            stockInfo.className = 'text-xs font-bold mt-1 ' + (variant.stock > 0 ? 'text-[#22C55E]' : 'text-[#EF4444]');
+            stockInfo.classList.remove('hidden');
+            variantError.classList.add('hidden');
+        } else {
+            selectedVariantId.value = '';
+            cartVariantId.value = '';
+            priceDisplay.textContent = 'Rp ' + basePrice.toLocaleString('id-ID');
+            stockInfo.classList.add('hidden');
+        }
+    }
+
+    document.querySelectorAll('.variant-attr-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (this.classList.contains('opacity-40')) return;
+            const group = this.closest('[data-attr-name]');
+            group.querySelectorAll('.variant-attr-btn').forEach(function(b) {
+                b.classList.remove('!bg-[#FFDE4D]', '!border-[#FFDE4D]', 'selected');
+            });
+            this.classList.add('!bg-[#FFDE4D]', '!border-[#FFDE4D]', 'selected');
+            updateVariantDisplay();
+        });
+    });
+}
+
+// Size selector (simple)
 const sizeOptions = document.querySelectorAll('.size-option');
 const selectedSize = document.getElementById('selected_size');
 const cartSize = document.getElementById('cart-size');
@@ -425,7 +567,12 @@ sizeOptions.forEach(btn => {
 });
 
 document.getElementById('add-to-cart-form')?.addEventListener('submit', function(e) {
-    <?php if (!empty($sizes)): ?>
+    <?php if (!empty($variantAttrs)): ?>
+    if (!document.getElementById('selected-variant-id').value) {
+        e.preventDefault();
+        document.getElementById('variant-error').classList.remove('hidden');
+    }
+    <?php elseif (!empty($sizes)): ?>
     if (!selectedSize.value) { e.preventDefault(); sizeError.classList.remove('hidden'); }
     <?php endif; ?>
 });
@@ -472,6 +619,7 @@ starBtns.forEach((btn, index) => {
             s.style.color = '';
         }
     });
+    if (typeof initVariantSelector === 'function') initVariantSelector();
 })();
 </script>
 <?= $this->endSection() ?>

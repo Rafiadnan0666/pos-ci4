@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title><?= isset($this->data['title']) ? $this->data['title'] . ' - ' : '' ?>Outdoor Gear Store</title>
+    <title><?= isset($this->data['title']) ? esc($this->data['title']) . ' - ' : '' ?>Outdoor Gear Store</title>
     <meta name="description" content="Premium outdoor gear for your next adventure" />
     <link rel="stylesheet" href="<?= base_url('css/tailwind.css') ?>" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>" />
+    <meta name="csrf-token" content="<?= csrf_hash() ?>">
 </head>
 <body class="min-h-screen flex flex-col">
     <header class="bg-neo-yellow border-b-4 border-black">
@@ -30,7 +31,7 @@
                 </a>
                 <?php if (session()->get('isLoggedIn')): ?>
                 <div class="flex items-center gap-2">
-                    <span class="font-bold text-xs"><?= session()->get('name') ?></span>
+                    <span class="font-bold text-xs"><?= esc(session()->get('name')) ?></span>
                     <a href="<?= base_url('logout') ?>" class="neo-btn-red text-xs !px-3 !py-1.5">Logout</a>
                 </div>
                 <?php else: ?>
@@ -45,7 +46,7 @@
         <div class="max-w-7xl mx-auto px-4 mt-4">
             <div class="neo-card-green flex items-center gap-3">
                 <span class="text-xl">✓</span>
-                <span class="font-bold"><?= session('message') ?></span>
+                <span class="font-bold"><?= esc(session('message')) ?></span>
             </div>
         </div>
         <?php endif; ?>
@@ -54,7 +55,7 @@
         <div class="max-w-7xl mx-auto px-4 mt-4">
             <div class="neo-card-orange flex items-center gap-3">
                 <span class="text-xl">✗</span>
-                <span class="font-bold"><?= session('error') ?></span>
+                <span class="font-bold"><?= esc(session('error')) ?></span>
             </div>
         </div>
         <?php endif; ?>
@@ -93,6 +94,25 @@
     </footer>
 
     <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="<?= env('MIDTRANS_CLIENT_KEY') ?>"></script>
+    <script>
+    (function() {
+        const csrfCookie = document.cookie.split(';').find(c => c.trim().startsWith('csrf_cookie_name='));
+        if (csrfCookie) {
+            const token = csrfCookie.split('=')[1];
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) meta.content = token;
+            const origFetch = window.fetch;
+            window.fetch = function(url, opts) {
+                opts = opts || {};
+                opts.headers = opts.headers || {};
+                if (opts.method && opts.method.toUpperCase() === 'POST') {
+                    opts.headers['X-CSRF-TOKEN'] = token;
+                }
+                return origFetch.call(this, url, opts);
+            };
+        }
+    })();
+    </script>
     <script src="<?= base_url('js/store.js') ?>"></script>
 </body>
 </html>

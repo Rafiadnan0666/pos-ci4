@@ -41,7 +41,7 @@
             <a href="<?= base_url('product/' . $p->slug) ?>" class="neo-card hover:bg-neo-yellow transition-colors flex flex-col no-underline text-black" data-aos="zoom-in" data-aos-delay="<?= ($i % 4) * 50 ?>">
                 <div class="bg-gray-100 border-2 border-black h-36 flex items-center justify-center text-5xl mb-3 overflow-hidden relative">
                     <?php if ($p->image): ?>
-                    <img src="<?= base_url($p->image) ?>" alt="<?= $p->name ?>" class="w-full h-full object-cover" />
+                    <img src="<?= base_url($p->image) ?>" alt="<?= esc($p->name) ?>" class="w-full h-full object-cover" />
                     <?php else: ?>
                     <span><?= $catIcon ?></span>
                     <?php endif; ?>
@@ -54,15 +54,16 @@
                 <?php if (!empty($p->brand)): ?>
                 <p class="text-[10px] font-bold opacity-60 uppercase tracking-wider"><?= esc($p->brand) ?></p>
                 <?php endif; ?>
-                <h3 class="font-heading font-bold text-sm uppercase leading-tight flex-1"><?= $p->name ?></h3>
+                <h3 class="font-heading font-bold text-sm uppercase leading-tight flex-1"><?= esc($p->name) ?></h3>
                 <?php $attrs = array_filter([$p->size ?? '', $p->color ?? '', $p->material ?? '']); ?>
                 <?php if (!empty($attrs)): ?>
-                <p class="text-xs font-bold text-gray-500 mt-1"><?= implode(' | ', $attrs) ?></p>
+                <p class="text-xs font-bold text-gray-500 mt-1"><?= esc(implode(' | ', $attrs)) ?></p>
                 <?php endif; ?>
                 <p class="text-xs text-gray-500 mt-1 line-clamp-2"><?= esc($p->description) ?></p>
                 <div class="flex items-center justify-between mt-3 pt-3 neo-divider">
                     <span class="font-black text-lg">Rp <?= number_format($p->price, 0, ',', '.') ?></span>
                     <form action="<?= base_url('cart/add') ?>" method="POST" onclick="event.stopPropagation()">
+                            <?= csrf_field() ?>
                         <input type="hidden" name="product_id" value="<?= $p->id ?>" />
                         <input type="hidden" name="quantity" value="1" />
                         <button type="submit" class="neo-btn-yellow text-xs !px-3 !py-1.5"

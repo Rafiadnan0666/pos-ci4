@@ -28,28 +28,33 @@
             <div class="neo-card flex items-start gap-4 cart-item" data-id="<?= $id ?>" data-aos="fade-up">
                 <div class="bg-gray-100 border-2 border-black w-20 h-20 flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
                     <?php if (!empty($item['image'])): ?>
-                    <img src="<?= base_url($item['image']) ?>" alt="<?= $item['name'] ?>" class="w-full h-full object-cover" />
+                    <img src="<?= base_url($item['image']) ?>" alt="<?= esc($item['name']) ?>" class="w-full h-full object-cover" />
                     <?php else: ?>
                     📦
                     <?php endif; ?>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="font-heading font-bold text-base uppercase"><?= $item['name'] ?></h3>
+                    <h3 class="font-heading font-bold text-base uppercase"><?= esc($item['name']) ?></h3>
+                    <?php if (!empty($item['variant_label'])): ?>
+                    <p class="text-xs font-bold text-neo-cyan mt-1"><?= esc($item['variant_label']) ?></p>
+                    <?php else: ?>
                     <?php $cartAttrs = array_filter([$item['size'] ?? '', $item['color'] ?? '', $item['material'] ?? '']); ?>
                     <?php if (!empty($cartAttrs)): ?>
-                    <p class="text-xs font-bold text-gray-500 mt-1"><?= implode(' | ', $cartAttrs) ?></p>
+                    <p class="text-xs font-bold text-gray-500 mt-1"><?= esc(implode(' | ', $cartAttrs)) ?></p>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <p class="font-bold text-sm mt-1">Rp <?= number_format($item['price'], 0, ',', '.') ?></p>
                     <div class="flex items-center gap-3 mt-2">
-                        <button class="neo-btn-white !px-2 !py-0.5 text-sm qty-dec" data-id="<?= $id ?>">-</button>
+                        <button class="neo-btn-white !px-2 !py-0.5 text-sm qty-dec" data-id="<?= $id ?>">−</button>
                         <span class="font-bold text-base qty"><?= $item['quantity'] ?></span>
                         <button class="neo-btn-white !px-2 !py-0.5 text-sm qty-inc" data-id="<?= $id ?>">+</button>
                         <span class="text-sm font-bold ml-4">Sub: Rp <?= number_format($item['price'] * $item['quantity'], 0, ',', '.') ?></span>
                     </div>
                 </div>
                 <form action="<?= base_url('cart/remove') ?>" method="POST">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="cart_key" value="<?= $id ?>" />
-                    <button type="submit" class="neo-btn-white text-xs !px-2 !py-1">✕</button>
+                    <button type="submit" class="neo-btn-red text-xs !px-2 !py-1">✕</button>
                 </form>
             </div>
             <?php endforeach; ?>

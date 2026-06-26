@@ -45,7 +45,7 @@
             <?= csrf_field() ?>
             <div class="mb-4">
                 <label class="block font-bold text-sm mb-1">Your Reply</label>
-                <textarea name="reply" rows="5" class="neo-input" placeholder="Write your reply to this review..."><?= old('reply', $review->reply ?? '') ?></textarea>
+                <textarea name="reply" rows="5" class="neo-input" placeholder="Write your reply to this review..."><?= esc(old('reply', $review->reply ?? '')) ?></textarea>
             </div>
             <div class="flex gap-3">
                 <button type="submit" class="neo-btn-cyan flex-1">💬 Submit Reply</button>

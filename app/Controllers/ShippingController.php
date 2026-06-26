@@ -36,7 +36,7 @@ class ShippingController extends BaseController
 
         $cart       = session()->get('buyer_cart') ?? [];
         $postalCode = $this->request->getPost('postal_code');
-        $courier    = $this->request->getPost('courier') ?? 'jne,tiki,pos,sicepat';
+        $courier    = !empty($this->request->getPost('courier')) ? $this->request->getPost('courier') : 'jne,tiki,pos,sicepat';
 
         if (empty($cart)) {
             return $this->response->setJSON(['success' => false, 'error' => 'Cart is empty']);

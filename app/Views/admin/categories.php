@@ -24,8 +24,8 @@
             <div class="flex items-center gap-4">
                 <span class="text-3xl"><?= $c->icon ?? '📦' ?></span>
                 <div>
-                    <h3 class="font-heading font-bold"><?= $c->name ?></h3>
-                    <p class="text-xs opacity-60 font-mono"><?= $c->slug ?></p>
+                    <h3 class="font-heading font-bold"><?= esc($c->name) ?></h3>
+                    <p class="text-xs opacity-60 font-mono"><?= esc($c->slug) ?></p>
                 </div>
             </div>
             <div class="flex gap-2">

@@ -14,7 +14,7 @@
     <div class="neo-card mb-6" data-aos="fade-up">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h2 class="text-lg font-black font-mono"><?= $order->order_number ?></h2>
+                <h2 class="text-lg font-black font-mono"><?= esc($order->order_number) ?></h2>
                 <p class="text-xs opacity-60 mt-1"><?= date('d M Y H:i', strtotime($order->created_at)) ?></p>
             </div>
             <div class="flex items-center gap-3">
@@ -32,13 +32,16 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm neo-divider pt-4">
             <div>
-                <p><span class="font-bold">Buyer:</span> <?= $order->buyer_name ?? 'N/A' ?></p>
-                <p><span class="font-bold">Email:</span> <?= $order->buyer_email ?? 'N/A' ?></p>
+                <p><span class="font-bold">Buyer:</span> <?= esc($order->buyer_name ?? 'N/A') ?></p>
+                <p><span class="font-bold">Email:</span> <?= esc($order->buyer_email ?? 'N/A') ?></p>
             </div>
             <?php if ($order->shipping_address): ?>
             <div>
-                <p><span class="font-bold">Address:</span> <?= $order->shipping_address ?></p>
-                <p><span class="font-bold">Courier:</span> <?= $order->courier_name ?> - <?= $order->courier_service ?></p>
+                <p><span class="font-bold">📍 Address:</span><br /><?= nl2br(esc($order->shipping_address)) ?></p>
+                <?php if (!empty($order->city_id)): ?>
+                <p><span class="font-bold">City:</span> <?= esc($order->city_id) ?></p>
+                <?php endif; ?>
+                <p><span class="font-bold">Courier:</span> <?= esc($order->courier_name) ?> - <?= esc($order->courier_service) ?></p>
                 <p><span class="font-bold">Shipping Cost:</span> Rp <?= number_format($order->shipping_cost, 0, ',', '.') ?></p>
                 <?php if (!empty($order->tracking_number)): ?>
                 <p><span class="font-bold">Tracking:</span> <?= esc($order->tracking_number) ?></p>
@@ -65,7 +68,7 @@
             <tbody>
                 <?php foreach ($items as $item): ?>
                 <tr class="border-b-2 border-black">
-                    <td class="py-2 font-bold"><?= $item->name ?? 'Item #' . $item->product_id ?><?= !empty($item->size) ? ' <span class="text-xs opacity-60">(' . esc($item->size) . ')</span>' : '' ?></td>
+                    <td class="py-2 font-bold"><?= esc($item->name ?? 'Item #' . $item->product_id) ?><?= !empty($item->size) ? ' <span class="text-xs opacity-60">(' . esc($item->size) . ')</span>' : '' ?></td>
                     <td class="py-2 text-center"><?= $item->quantity ?></td>
                     <td class="py-2 text-right">Rp <?= number_format($item->price, 0, ',', '.') ?></td>
                     <td class="py-2 text-right font-bold">Rp <?= number_format($item->subtotal, 0, ',', '.') ?></td>

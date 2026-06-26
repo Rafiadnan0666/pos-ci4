@@ -12,7 +12,7 @@
     <div class="neo-card bg-[#FEE2E2] mb-6" data-aos="fade-up">
         <h3 class="font-black text-sm">⚠️ ERRORS</h3>
         <ul class="mt-2 text-sm space-y-1">
-            <?php foreach (session('errors') as $e): ?><li>• <?= $e ?></li><?php endforeach; ?>
+            <?php foreach (session('errors') as $e): ?><li>• <?= esc($e) ?></li><?php endforeach; ?>
         </ul>
     </div>
     <?php endif; ?>

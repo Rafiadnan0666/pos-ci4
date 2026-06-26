@@ -3,14 +3,17 @@
 namespace App\Controllers;
 
 use App\Models\ProductModel;
+use App\Models\ProductVariantModel;
 
 class Cart extends BaseController
 {
     private ProductModel $productModel;
+    private ProductVariantModel $variantModel;
 
     public function __construct()
     {
         $this->productModel = model('App\Models\ProductModel');
+        $this->variantModel = model('App\Models\ProductVariantModel');
     }
 
     public function index()
@@ -37,23 +40,42 @@ class Cart extends BaseController
         $productId = (int) $this->request->getPost('product_id');
         $quantity  = (int) ($this->request->getPost('quantity') ?? 1);
         $size      = $this->request->getPost('size');
+        $variantId = (int) ($this->request->getPost('variant_id') ?? 0);
         $product   = $this->productModel->find($productId);
 
         if (!$product) {
             return redirect()->back()->with('error', 'Product not found');
         }
 
-        if ($product->stock < $quantity) {
+        // Handle variant-based stock/price
+        $variant = null;
+        $finalPrice = (float) $product->price;
+        $finalStock = $product->stock;
+        $variantLabel = '';
+
+        if ($variantId > 0) {
+            $variant = $this->variantModel->find($variantId);
+            if ($variant && $variant->product_id == $productId) {
+                $finalStock = $variant->stock;
+                $finalPrice = $variant->price ? (float) $variant->price : $finalPrice;
+                $vAttrs = json_decode($variant->attributes, true) ?? [];
+                $attrParts = [];
+                foreach ($vAttrs as $k => $v) { $attrParts[] = "$k: $v"; }
+                $variantLabel = implode(', ', $attrParts);
+            }
+        }
+
+        if ($finalStock < $quantity) {
             return redirect()->back()->with('error', 'Not enough stock available');
         }
 
         $cart = session()->get('buyer_cart') ?? [];
 
-        $cartKey = $productId . ($size ? '-' . $size : '');
+        $cartKey = $productId . ($variantId > 0 ? '-v' . $variantId : ($size ? '-' . $size : ''));
 
         if (isset($cart[$cartKey])) {
             $newQty = $cart[$cartKey]['quantity'] + $quantity;
-            if ($newQty > $product->stock) {
+            if ($newQty > $finalStock) {
                 return redirect()->back()->with('error', 'Not enough stock available');
             }
             $cart[$cartKey]['quantity'] = $newQty;
@@ -61,15 +83,17 @@ class Cart extends BaseController
             $cart[$cartKey] = [
                 'product_id' => $product->id,
                 'name'       => $product->name,
-                'price'      => (float) $product->price,
+                'price'      => $finalPrice,
                 'weight'     => (int) $product->weight_grams,
                 'quantity'   => $quantity,
-                'image'      => $product->image,
+                'image'      => $variant && $variant->image ? $variant->image : $product->image,
                 'slug'       => $product->slug,
-                'stock'      => $product->stock,
+                'stock'      => $finalStock,
                 'size'       => $size ?: $product->size,
                 'color'      => $product->color,
                 'material'   => $product->material,
+                'variant_id' => $variantId > 0 ? $variantId : null,
+                'variant_label' => $variantLabel,
             ];
         }
 
@@ -84,8 +108,7 @@ class Cart extends BaseController
             return $this->response->setJSON(['success' => false, 'error' => 'Invalid request']);
         }
 
-        $cartKey = $this->request->getPost('product_id');
-        $cartKey = $this->request->getPost('cart_key') ?: $cartKey;
+        $cartKey = $this->request->getPost('cart_key') ?: $this->request->getPost('product_id');
         $quantity  = (int) $this->request->getPost('quantity');
         $cart      = session()->get('buyer_cart') ?? [];
 
@@ -96,8 +119,16 @@ class Cart extends BaseController
         if ($quantity < 1) {
             unset($cart[$cartKey]);
         } else {
-            $product = $this->productModel->find($cart[$cartKey]['product_id']);
-            if ($product && $quantity > $product->stock) {
+            $item = $cart[$cartKey];
+            $maxStock = $item['stock'] ?? 0;
+            if ($item['variant_id']) {
+                $variant = $this->variantModel->find($item['variant_id']);
+                if ($variant) $maxStock = $variant->stock;
+            } else {
+                $product = $this->productModel->find($item['product_id']);
+                if ($product) $maxStock = $product->stock;
+            }
+            if ($quantity > $maxStock) {
                 return $this->response->setJSON(['success' => false, 'error' => 'Not enough stock']);
             }
             $cart[$cartKey]['quantity'] = $quantity;

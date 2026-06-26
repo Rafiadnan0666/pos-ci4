@@ -38,15 +38,15 @@
         <a href="<?= base_url('admin/order/' . $o->order_number) ?>" class="flex items-center justify-between p-4 border-4 border-black bg-white hover:bg-[#FFDE4D] transition-colors no-underline text-black" style="box-shadow:4px 4px 0px 0px rgba(0,0,0,1);" data-aos="fade-up" data-aos-delay="<?= ($i % 10) * 30 ?>">
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-3">
-                    <span class="font-black font-mono text-sm"><?= $o->order_number ?></span>
+                    <span class="font-black font-mono text-sm"><?= esc($o->order_number) ?></span>
                     <span class="text-xs font-bold opacity-60"><?= date('d M Y H:i', strtotime($o->created_at)) ?></span>
                 </div>
                 <div class="flex items-center gap-3 mt-1">
-                    <span class="text-sm font-bold"><?= $o->buyer_name ?? 'N/A' ?></span>
-                    <span class="text-xs opacity-60"><?= $o->buyer_email ?? '' ?></span>
+                    <span class="text-sm font-bold"><?= esc($o->buyer_name ?? 'N/A') ?></span>
+                    <span class="text-xs opacity-60"><?= esc($o->buyer_email ?? '') ?></span>
                 </div>
                 <?php if ($o->courier_name): ?>
-                <span class="text-xs opacity-60"><?= $o->courier_name ?> - <?= $o->courier_service ?></span>
+                <span class="text-xs opacity-60"><?= esc($o->courier_name) ?> - <?= esc($o->courier_service) ?></span>
                 <?php endif; ?>
             </div>
             <div class="text-right flex-shrink-0">

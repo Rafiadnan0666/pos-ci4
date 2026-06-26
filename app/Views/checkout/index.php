@@ -2,12 +2,6 @@
 
 <?= $this->section('styles') ?>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-.leaflet-container { border: 4px solid #000; }
-.location-btn { font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; text-transform: uppercase; font-size: .75rem; padding: .5rem 1rem; border: 4px solid #000; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); cursor: pointer; transition: all 75ms; display: inline-flex; align-items: center; justify-content: center; gap: .5rem; }
-.location-btn:hover { translate: 2px 2px; box-shadow: 2px 2px 0px 0px #000; }
-.location-btn:active { translate: 4px 4px; box-shadow: none; }
-</style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -53,7 +47,7 @@
                 <h2 class="text-lg font-black mb-4">SHIPPING ADDRESS</h2>
                 <div class="space-y-4">
                     <div>
-                        <label class="block font-heading font-bold text-sm mb-1">Search City / Area (OpenStreetMap)</label>
+                        <label class="block font-heading font-bold text-sm mb-1">📍 Search City / Area</label>
                         <input type="text" id="city_search" class="neo-input" placeholder="Type city name..." autocomplete="off" />
                         <div id="city_results" class="hidden mt-1 border-4 border-black bg-white max-h-40 overflow-y-auto"></div>
                         <input type="hidden" id="city_id" />
@@ -74,13 +68,13 @@
                         <textarea id="address" class="neo-input" rows="3" placeholder="Street, district, city, province"></textarea>
                     </div>
                     <div>
-                        <label class="block font-heading font-bold text-sm mb-1">📍 Pin Location on Map <span class="text-xs opacity-60">(drag the marker or click map)</span></label>
+                        <label class="block font-heading font-bold text-sm mb-1">📍 Pin Location on Map <span class="text-xs opacity-60">(click map or drag marker to set exact position)</span></label>
                         <div id="map" style="height: 300px;" class="border-4 border-black"></div>
                         <div class="flex gap-2 mt-2">
-                            <button type="button" id="use-current-location" class="location-btn bg-[#FFDE4D] text-black text-xs">
+                            <button type="button" id="use-current-location" class="neo-btn-yellow text-xs">
                                 📡 Use My Location
                             </button>
-                            <button type="button" id="clear-location" class="location-btn bg-white text-black text-xs">
+                            <button type="button" id="clear-location" class="neo-btn-white text-xs">
                                 ✕ Clear Pin
                             </button>
                         </div>
@@ -110,7 +104,7 @@
                         </label>
                     </div>
                     <button id="get-rates" class="neo-btn-cyan text-sm" disabled>Get Shipping Rates</button>
-                    <div id="rates-loading" class="hidden text-sm font-bold">Loading rates...</div>
+                    <div id="rates-loading" class="hidden text-sm font-bold animate-pulse-neo p-3 bg-neo-yellow border-4 border-black text-center">Loading rates...</div>
                     <div id="rates-list" class="space-y-2"></div>
                     <div id="selected-rate-display" class="hidden neo-card-green !p-3 text-sm font-bold">
                         Selected: <span id="selected-rate-text"></span>
@@ -125,7 +119,14 @@
                 <div class="space-y-3">
                     <?php foreach ($cart as $key => $item): ?>
                     <div class="flex items-center justify-between text-sm">
-                        <span class="font-bold flex-1"><?= $item['name'] ?><?= !empty($item['size']) ? ' <span class="text-xs opacity-60">(' . esc($item['size']) . ')</span>' : '' ?> <span class="text-xs">x<?= $item['quantity'] ?></span></span>
+                        <span class="font-bold flex-1"><?= esc($item['name']) ?>
+                            <?php if (!empty($item['variant_label'])): ?>
+                            <span class="text-xs opacity-60 block"><?= esc($item['variant_label']) ?></span>
+                            <?php elseif (!empty($item['size'])): ?>
+                            <span class="text-xs opacity-60">(<?= esc($item['size']) ?>)</span>
+                            <?php endif; ?>
+                            <span class="text-xs">x<?= $item['quantity'] ?></span>
+                        </span>
                         <span>Rp <?= number_format($item['price'] * $item['quantity'], 0, ',', '.') ?></span>
                     </div>
                     <?php endforeach; ?>
@@ -192,8 +193,8 @@ function updateLocation(lat, lng) {
     document.getElementById('latitude').value = lat.toFixed(6);
     document.getElementById('longitude').value = lng.toFixed(6);
     document.getElementById('location-status').classList.remove('hidden');
-
     reverseGeocode(lat, lng);
+    enableGetRates();
 }
 
 function reverseGeocode(lat, lng) {
@@ -508,7 +509,6 @@ document.getElementById('pay-now').addEventListener('click', function () {
         if (data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
                 onSuccess: function (result) {
-                    // Verify payment then show success overlay instead of redirect
                     fetch('<?= base_url('payment/verifyStatus') ?>', {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -520,7 +520,6 @@ document.getElementById('pay-now').addEventListener('click', function () {
                     });
                 },
                 onPending: function (result) {
-                    // For pending (QRIS/GoPay), show success page with polling
                     window.location.href = '<?= base_url('order/success') ?>' + '/' + data.order_number + '?pending=1';
                 },
                 onError: function (result) {

@@ -211,6 +211,12 @@ class Pos extends BaseController
         }
 
         $paymentMethod = $this->request->getPost('payment_method');
+        if (!in_array($paymentMethod, ['cash', 'payment_link'], true)) {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['success' => false, 'error' => 'Invalid payment method']);
+            }
+            return redirect()->to('/pos')->with('error', 'Invalid payment method');
+        }
 
         $orderModel     = model('App\Models\OrderModel');
         $orderItemModel = model('App\Models\OrderItemModel');

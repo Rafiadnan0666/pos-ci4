@@ -10,6 +10,7 @@ use App\Models\CategoryModel;
 use App\Models\ReviewModel;
 use App\Models\ProductSizeModel;
 use App\Models\ProductImageModel;
+use App\Models\ProductVariantModel;
 use App\Libraries\Biteship;
 
 class Admin extends BaseController
@@ -22,6 +23,7 @@ class Admin extends BaseController
     private ReviewModel $reviewModel;
     private ProductSizeModel $sizeModel;
     private ProductImageModel $productImageModel;
+    private ProductVariantModel $variantModel;
 
     public function __construct()
     {
@@ -31,8 +33,9 @@ class Admin extends BaseController
         $this->userModel        = model('App\Models\UserModel');
         $this->categoryModel    = model('App\Models\CategoryModel');
         $this->reviewModel      = model('App\Models\ReviewModel');
-        $this->sizeModel        = model('App\Models\ProductSizeModel');
+        $this->sizeModel         = model('App\Models\ProductSizeModel');
         $this->productImageModel = model('App\Models\ProductImageModel');
+        $this->variantModel      = model('App\Models\ProductVariantModel');
     }
 
     public function dashboard()
@@ -837,6 +840,69 @@ class Admin extends BaseController
             'product'  => $product,
             'sizes'    => $sizes,
             'hasSizes' => $hasSizes,
+        ]);
+    }
+
+    // ─── Product Variant Management (Advanced) ───────────────
+
+    public function productVariants(int $productId)
+    {
+        $product = $this->productModel->find($productId);
+        if (!$product) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
+
+        if ($this->request->getMethod() === 'POST') {
+            $variants = $this->request->getPost('variants');
+
+            $this->variantModel->deleteByProduct($productId);
+
+            if (!empty($variants) && is_array($variants)) {
+                foreach ($variants as $v) {
+                    $attrs = [];
+                    if (!empty($v['attr_names']) && !empty($v['attr_values'])) {
+                        $names  = $v['attr_names'];
+                        $values = $v['attr_values'];
+                        foreach ($names as $i => $name) {
+                            if (!empty($name) && isset($values[$i])) {
+                                $attrs[trim($name)] = trim($values[$i]);
+                            }
+                        }
+                    }
+                    if (!empty($attrs)) {
+                        $this->variantModel->insert([
+                            'product_id' => $productId,
+                            'sku'        => $v['sku'] ?? null,
+                            'price'      => !empty($v['price']) ? (float) $v['price'] : null,
+                            'stock'      => (int) ($v['stock'] ?? 0),
+                            'image'      => $v['image'] ?? null,
+                            'sort_order' => (int) ($v['sort_order'] ?? 0),
+                            'attributes' => json_encode($attrs, JSON_UNESCAPED_UNICODE),
+                        ]);
+                    }
+                }
+            }
+
+            return redirect()->to('/admin/products')->with('message', 'Variants updated successfully');
+        }
+
+        $variants = $this->variantModel->getByProduct($productId);
+        $hasVariants = !empty($variants);
+
+        // Collect all attribute names across variants
+        $allAttrNames = [];
+        foreach ($variants as $v) {
+            $attrs = json_decode($v->attributes, true) ?? [];
+            foreach (array_keys($attrs) as $k) {
+                if (!in_array($k, $allAttrNames)) $allAttrNames[] = $k;
+            }
+        }
+
+        return view('admin/product_variants', [
+            'product'      => $product,
+            'variants'     => $variants,
+            'hasVariants'  => $hasVariants,
+            'allAttrNames' => $allAttrNames,
         ]);
     }
 

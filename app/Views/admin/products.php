@@ -18,7 +18,7 @@
                 <?php foreach ($categories as $c): ?>
                 <a href="<?= base_url('admin/products?category=' . urlencode($c->name) . ($search ? '&search=' . urlencode($search) : '')) ?>"
                    class="neo-btn-white text-xs !px-3 !py-1.5 <?= $selectedCat === $c->name ? 'bg-[#FFDE4D]' : '' ?>">
-                    <?= $c->name ?>
+                    <?= esc($c->name) ?>
                 </a>
                 <?php endforeach; ?>
             </div>
@@ -39,7 +39,7 @@
         <?php foreach ($grouped as $cat => $items): ?>
         <div class="mb-8" data-aos="fade-up">
             <h2 class="text-xl font-black mb-4 flex items-center gap-2 bg-black text-white px-4 py-2 inline-block">
-                <?= $cat ?> <span class="text-sm opacity-70">(<?= count($items) ?>)</span>
+                <?= esc($cat) ?> <span class="text-sm opacity-70">(<?= count($items) ?>)</span>
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <?php foreach ($items as $p): ?>
@@ -53,8 +53,8 @@
                             <?php endif; ?>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="font-heading font-bold text-sm leading-tight"><?= $p->name ?></h3>
-                            <p class="text-xs opacity-60 mt-1 font-mono"><?= $p->slug ?></p>
+                            <h3 class="font-heading font-bold text-sm leading-tight"><?= esc($p->name) ?></h3>
+                            <p class="text-xs opacity-60 mt-1 font-mono"><?= esc($p->slug) ?></p>
                             <div class="flex items-center gap-2 mt-2">
                                 <span class="font-black">Rp <?= number_format($p->price, 0, ',', '.') ?></span>
                                 <span class="neo-badge <?= $p->stock > 5 ? 'bg-[#22C55E]' : ($p->stock > 0 ? 'bg-[#FFDE4D]' : 'bg-[#EF4444] text-white') ?>">
@@ -67,18 +67,17 @@
                                 <?php if (!empty($p->color)): ?><span class="text-xs opacity-60">🎨 <?= esc($p->color) ?></span><?php endif; ?>
                                 <?php if (!empty($p->material)): ?><span class="text-xs opacity-60">🧵 <?= esc($p->material) ?></span><?php endif; ?>
                                 <?php if (!empty($p->brand)): ?><span class="text-xs opacity-60">🏷️ <?= esc($p->brand) ?></span><?php endif; ?>
-                                <?php if ($p->image): ?>
-                                <span class="text-xs opacity-60">🖼️</span>
-                                <?php endif; ?>
+                                <?php if ($p->image): ?><span class="text-xs opacity-60">🖼️</span><?php endif; ?>
                             </div>
                         </div>
                     </div>
                     <div class="flex gap-2 mt-4 pt-3 border-t-2 border-black flex-wrap">
-                        <a href="<?= base_url('admin/products/edit/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5 text-center">✏️ Edit</a>
-                        <a href="<?= base_url('admin/products/sizes/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5 text-center">📏 Sizes</a>
+                        <a href="<?= base_url('admin/products/edit/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5">✏️ Edit</a>
+                        <a href="<?= base_url('admin/products/variants/' . $p->id) ?>" class="neo-btn-cyan text-xs !px-3 !py-1.5">🎨 Variants</a>
+                        <a href="<?= base_url('admin/products/sizes/' . $p->id) ?>" class="neo-btn-white text-xs !px-3 !py-1.5">📏 Sizes</a>
                         <form action="<?= base_url('admin/products/delete/' . $p->id) ?>" method="POST" onsubmit="return confirm('Delete <?= esc($p->name, 'js') ?>?')" class="inline">
                             <?= csrf_field() ?>
-                            <button type="submit" class="neo-btn-white text-xs !px-3 !py-1.5 hover:!bg-[#EF4444] hover:!text-white">🗑️ Delete</button>
+                            <button type="submit" class="neo-btn-white text-xs !px-3 !py-1.5 hover:!bg-[#EF4444] hover:!text-white">🗑️</button>
                         </form>
                     </div>
                 </div>

@@ -79,6 +79,8 @@ $routes->post('admin/reviews/toggle-status/(:num)', 'Admin::toggleReviewStatus/$
 $routes->post('admin/reviews/delete/(:num)', 'Admin::deleteReview/$1', ['filter' => 'auth:owner']);
 $routes->get('admin/products/sizes/(:num)', 'Admin::productSizes/$1', ['filter' => 'auth:owner']);
 $routes->post('admin/products/sizes/(:num)', 'Admin::productSizes/$1', ['filter' => 'auth:owner']);
+$routes->get('admin/products/variants/(:num)', 'Admin::productVariants/$1', ['filter' => 'auth:owner']);
+$routes->post('admin/products/variants/(:num)', 'Admin::productVariants/$1', ['filter' => 'auth:owner']);
 $routes->get('admin/test-api', 'Admin::testApi', ['filter' => 'auth:owner']);
 
 // Order History (buyer)

@@ -19,7 +19,7 @@
     <div class="neo-card bg-[#FEE2E2] mb-6" data-aos="fade-up">
         <h3 class="font-black text-sm">⚠️ ERRORS</h3>
         <ul class="mt-2 text-sm space-y-1">
-            <?php foreach (session('errors') as $e): ?><li>• <?= $e ?></li><?php endforeach; ?>
+            <?php foreach (session('errors') as $e): ?><li>• <?= esc($e) ?></li><?php endforeach; ?>
         </ul>
     </div>
     <?php endif; ?>
@@ -210,8 +210,9 @@
 
             <?php if ($product): ?>
             <div class="neo-divider my-4"></div>
-            <div class="flex gap-3">
-                <a href="<?= base_url('admin/products/sizes/' . $product->id) ?>" class="neo-btn-white text-sm flex-1 text-center">📏 Manage Sizes & Stock</a>
+            <div class="flex gap-3 flex-wrap">
+                <a href="<?= base_url('admin/products/sizes/' . $product->id) ?>" class="neo-btn-white text-sm flex-1 text-center">📏 Simple Sizes</a>
+                <a href="<?= base_url('admin/products/variants/' . $product->id) ?>" class="neo-btn-cyan text-sm flex-1 text-center">🎨 Advanced Variants</a>
             </div>
             <?php endif; ?>
 

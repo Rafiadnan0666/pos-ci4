@@ -37,23 +37,45 @@
         <div class="space-y-2 text-sm">
             <div class="flex justify-between">
                 <span class="font-bold">Order Number</span>
-                <span class="font-mono"><?= $order->order_number ?></span>
+                <span class="font-mono"><?= esc($order->order_number) ?></span>
             </div>
             <div class="flex justify-between">
                 <span class="font-bold">Buyer</span>
-                <span><?= $order->buyer_name ?></span>
+                <span><?= esc($order->buyer_name) ?></span>
             </div>
             <div class="flex justify-between">
                 <span class="font-bold">Date</span>
                 <span><?= date('d M Y H:i', strtotime($order->created_at)) ?></span>
             </div>
-            <?php if ($order->courier_name): ?>
-            <div class="flex justify-between">
-                <span class="font-bold">Shipping</span>
-                <span><?= $order->courier_name ?> - <?= $order->courier_service ?></span>
-            </div>
-            <?php endif; ?>
         </div>
+
+        <?php if ($order->shipping_address): ?>
+        <div class="neo-divider my-4"></div>
+        <div class="bg-[#FFDE4D] border-4 border-black p-4 -mx-4" style="margin-left:-1rem;margin-right:-1rem;">
+            <h3 class="font-black text-sm mb-3 flex items-center gap-2">
+                <span>📍</span> DELIVERY LOCATION
+            </h3>
+            <div class="space-y-2 text-sm">
+                <p>
+                    <span class="font-bold">Address:</span><br />
+                    <?= nl2br(esc($order->shipping_address)) ?>
+                </p>
+                <?php if (!empty($order->city_id)): ?>
+                <p><span class="font-bold">City:</span> <?= esc($order->city_id) ?></p>
+                <?php endif; ?>
+                <div class="flex flex-wrap gap-x-6 gap-y-1">
+                    <p><span class="font-bold">Courier:</span> <?= esc($order->courier_name) ?> - <?= esc($order->courier_service) ?></p>
+                    <p><span class="font-bold">Shipping Cost:</span> Rp <?= number_format($order->shipping_cost, 0, ',', '.') ?></p>
+                </div>
+                <?php if (!empty($order->tracking_number)): ?>
+                <p><span class="font-bold">📦 Tracking:</span> <?= esc($order->tracking_number) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($order->tracking_url)): ?>
+                <a href="<?= esc($order->tracking_url) ?>" target="_blank" class="neo-btn-cyan text-xs !px-3 !py-1.5 mt-2 inline-block">🔗 Track Shipment</a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="neo-divider my-4"></div>
 
@@ -69,7 +91,7 @@
             <tbody>
                 <?php foreach ($items as $item): ?>
                 <tr class="border-b-2 border-black">
-                    <td class="py-2 font-bold"><?= $item->name ?? 'Item' ?></td>
+                    <td class="py-2 font-bold"><?= esc($item->name ?? 'Item') ?></td>
                     <td class="py-2 text-center"><?= $item->quantity ?></td>
                     <td class="py-2 text-right">Rp <?= number_format($item->price, 0, ',', '.') ?></td>
                     <td class="py-2 text-right font-bold">Rp <?= number_format($item->subtotal, 0, ',', '.') ?></td>
@@ -99,7 +121,7 @@
 
     <div class="text-center space-x-3">
         <?php if ($order->payment_status === 'pending'): ?>
-        <button id="pay-now-success" class="neo-btn-green" data-order="<?= $order->order_number ?>">
+        <button id="pay-now-success" class="neo-btn-green" data-order="<?= esc($order->order_number) ?>">
             💳 Pay Now (Rp <?= number_format($order->gross_amount, 0, ',', '.') ?>)
         </button>
         <?php endif; ?>
@@ -109,21 +131,22 @@
 </div>
 
 <?php if ($order->payment_status === 'pending'): ?>
-<div class="neo-card-orange !text-white text-center mb-6" data-aos="fade-up">
+<div class="neo-card-orange !text-white text-center max-w-3xl mx-auto mb-6" data-aos="fade-up">
     <p class="font-bold">
         💡 If you paid with QRIS (GoPay/Dana) in sandbox mode, payments are simulated.
     </p>
     <div class="flex items-center justify-center gap-3 mt-2 flex-wrap">
-        <button id="simulate-payment" class="neo-btn-yellow !text-black text-sm" data-order="<?= $order->order_number ?>">
+        <button id="simulate-payment" class="neo-btn-yellow !text-black text-sm" data-order="<?= esc($order->order_number) ?>">
             ⚡ Simulate Payment (Sandbox Only)
         </button>
-        <button id="pay-now-success-2" class="neo-btn-green text-sm" data-order="<?= $order->order_number ?>">
+        <button id="pay-now-success-2" class="neo-btn-green text-sm" data-order="<?= esc($order->order_number) ?>">
             💳 Retry Payment
         </button>
     </div>
     <p class="text-xs mt-2 opacity-80">This simulates a successful Midtrans settlement for testing.</p>
 </div>
 
+<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="<?= trim(env('MIDTRANS_CLIENT_KEY', '')) ?>"></script>
 <script>
 function payNow(orderNumber, btnEl) {
     btnEl.disabled = true;
@@ -148,11 +171,7 @@ function payNow(orderNumber, btnEl) {
             btnEl.textContent = '💳 Pay Now';
         }
     })
-    .catch(function() {
-        alert('Network error');
-        btnEl.disabled = false;
-        btnEl.textContent = '💳 Pay Now';
-    });
+    .catch(function() { alert('Network error'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; });
 }
 document.querySelectorAll('[id^="pay-now-success"]').forEach(function(btn) {
     btn.addEventListener('click', function() { payNow(this.dataset.order, this); });
@@ -168,26 +187,17 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.success) {
-            location.reload();
-        } else {
-            btn.disabled = false;
-            btn.textContent = '⚡ Simulate Payment (Sandbox Only)';
-            alert(data.error || 'Failed to simulate payment');
-        }
+        if (data.success) { location.reload(); }
+        else { btn.disabled = false; btn.textContent = '⚡ Simulate Payment (Sandbox Only)'; alert(data.error || 'Failed to simulate payment'); }
     })
-    .catch(function() {
-        btn.disabled = false;
-        btn.textContent = '⚡ Simulate Payment (Sandbox Only)';
-        alert('Network error');
-    });
+    .catch(function() { btn.disabled = false; btn.textContent = '⚡ Simulate Payment (Sandbox Only)'; alert('Network error'); });
 });
 
 (function pollStatus() {
     fetch('<?= base_url('payment/verifyStatus') ?>', {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'order_number=<?= $order->order_number ?>'
+        body: 'order_number=' + encodeURIComponent('<?= esc($order->order_number, 'js') ?>')
     })
     .then(function(r) { return r.json(); })
     .then(function(verifyData) {
@@ -211,9 +221,7 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 return;
             }
         }
-        fetch('<?= base_url('order/detail/' . $order->order_number) ?>?ajax=1', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
+        fetch('<?= base_url('order/detail/' . esc($order->order_number)) ?>?ajax=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.status === 'settlement') {
@@ -231,18 +239,12 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold text-white">Payment ' + data.status + ' — please try again.</span>';
                 document.getElementById('status-badge').textContent = data.status.toUpperCase();
                 document.getElementById('status-badge').className = 'neo-badge bg-[#EF4444] text-white';
-            } else {
-                setTimeout(pollStatus, 3000);
-            }
+            } else { setTimeout(pollStatus, 3000); }
         })
-        .catch(function() {
-            setTimeout(pollStatus, 5000);
-        });
+        .catch(function() { setTimeout(pollStatus, 5000); });
     })
     .catch(function() {
-        fetch('<?= base_url('order/detail/' . $order->order_number) ?>?ajax=1', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
+        fetch('<?= base_url('order/detail/' . esc($order->order_number)) ?>?ajax=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.status === 'settlement') {
@@ -253,13 +255,9 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
                 document.getElementById('status-badge').textContent = 'SETTLEMENT';
                 document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
-            } else {
-                setTimeout(pollStatus, 5000);
-            }
+            } else { setTimeout(pollStatus, 5000); }
         })
-        .catch(function() {
-            setTimeout(pollStatus, 5000);
-        });
+        .catch(function() { setTimeout(pollStatus, 5000); });
     });
 })();
 </script>

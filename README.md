@@ -49,13 +49,16 @@ A full-featured **Point of Sale (POS)** and **E-Commerce** web application built
 ### Key Design Decisions
 
 - **Neo-brutalist styling** throughout: 4px black borders, `box-shadow: 4px 4px 0 0 #000`, uppercase Space Grotesk headings, bold color blocks (`#FFDE4D` yellow, `#06B6D4` cyan, `#F97316` orange)
-- **Cart keys** are `product_id` or `product_id-size` for size-variant items (composite keys)
+- **Cart keys** are `product_id`, `product_id-v{id}` for variant items, or `product_id-size` for size-variant items (composite keys)
 - **Cart data** stored in `session('buyer_cart')` — cleared after successful order
 - **Stock** is decremented on payment settlement, not on order creation
 - **Features/Specs** stored as JSON in DB, entered as plain text in admin form (one per line for features, `key: value` per line for specs)
 - **Product images** stored in `public/uploads/products/`; gallery images in `product_images` table
 - **Payment success** now shows an overlay on checkout page (pending payments redirect to success page for QRIS polling)
 - **POS dashboard** does `location.reload()` on success to reset cart state
+- **Product Variants** use a single `attributes` JSON column (key-value pairs like `{"Color":"Red","Size":"XL"}`) instead of EAV pattern for simplicity and performance
+- **Variant pricing** is nullable; when null, uses product base price — allows partial price overrides per variant combination
+- **CSRF Protection** enabled globally via cookie-based tokens; all POST forms must include `<?= csrf_field() ?>` and AJAX POST requests must send `X-CSRF-TOKEN` header
 
 ---
 
@@ -174,6 +177,7 @@ php spark migrate:status
 | `013_AlterOrderItemsAddSize` | Size column on order_items |
 | `014_AlterProductsAddAdvancedFields` | Brand, dimensions, warranty, video, features, specs, care instructions |
 | `015_CreateProductImagesTable` | Product gallery images |
+| `016_CreateProductVariantsTable` | Multi-attribute product variants with JSON attributes, price override, SKU |
 
 ---
 
@@ -211,10 +215,12 @@ A rich, tabbed product detail page:
 - **Main image** with gallery thumbnails — click thumbnail to switch main image
 - **Brand badge** and category badge
 - **Star rating** from customer reviews
-- **Stock status** (with per-size availability if size variants exist)
-- **Size selector** — click a size to select, shows remaining stock per size, validates before adding to cart
-- **Quantity selector** with +/- buttons, respects per-size max stock
-- **Add to Cart** button
+- **Stock status** (with per-size or variant availability)
+- **Size selector** — click a size to select, shows remaining stock per size, validates before adding to cart (fallback if no advanced variants)
+- **Advanced Variant Selector** — if product has variants defined (e.g. Color + Size combinations), shows attribute buttons (color/size/material). Selecting values finds matching variant and updates price/stock dynamically via JS. Variant price override supported.
+- **Variant stock & price display** — shows "X units available" with green/red text, updates product price when variant has price override
+- **Quantity selector** with +/- buttons, respects variant max stock
+- **Add to Cart** button — passes `variant_id` when variant selected
 - **Attributes badges**: color, material, weight, warranty, dimensions
 
 **Tabs section:**
@@ -325,13 +331,23 @@ Access at `/admin/dashboard`
 6. **Gallery Images**: multiple file upload, individual remove buttons (removed on form submit), displayed as thumbnails
 7. **Manage Sizes & Stock** button (see below)
 
-### Per-Size Stock
+### Advanced Product Variants
 
-Products can have size variants (e.g., S, M, L, XL) each with independent stock:
+Products can have **multi-attribute variants** (e.g., Color + Size combinations like "Red / XL") with independent stock, price overrides, and SKU tracking:
+
+- **Admin**: `/admin/products/variants/:id` — dynamic form to add/remove/save variant rows. Each row has 3 attribute name fields + 3 attribute value fields (e.g. Color=Red, Size=XL, Material=Cotton), plus price override, stock, SKU, sort order.
+- **Storefront**: interactive attribute selector on product detail page — clicking attribute values (e.g. "Red" then "XL") finds the matching variant and updates price/stock display
+- **Cart**: uses `product_id-v{id}` as cart key, stores `variant_label` (e.g. "Color: Red, Size: XL") for display in cart and checkout
+- **Variant Stock Check**: cart update respects variant stock (not just base product stock)
+- **Variant Price**: nullable price field — null = use base product price, non-null = price override for that specific combination
+
+### Per-Size Stock (Legacy)
+
+Products can also have simple size variants (e.g., S, M, L, XL) each with independent stock (used when no advanced variants are defined):
 
 - **Admin**: `/admin/products/sizes/:id` — dynamic form to add/remove/save size-stock rows
 - **Storefront**: size selector on product detail shows per-size stock, disables sold-out sizes
-- **Cart**: uses `product_id-size` as cart key so same product in different sizes = separate items
+- **Cart**: uses `product_id-size` as cart key
 - **Orders**: `order_items.size` column captures the selected size
 
 ### User Profile & Avatar
@@ -442,7 +458,7 @@ pos-ci4/
 │   │   ├── Pos.php               # POS dashboard
 │   │   ├── Profile.php           # User profile & avatar
 │   │   └── ShippingController.php# Biteship courier rates
-│   ├── Database/Migrations/      # 15 migration files
+│   ├── Database/Migrations/      # 16 migration files
 │   ├── Libraries/
 │   │   ├── Midtrans.php          # Midtrans Snap API + verification
 │   │   └── Biteship.php          # Biteship API client
@@ -453,13 +469,15 @@ pos-ci4/
 │   │   ├── ProductImageModel.php # Gallery image CRUD with file cleanup
 │   │   ├── ProductModel.php
 │   │   ├── ProductSizeModel.php  # Per-size stock CRUD
+│   │   ├── ProductVariantModel.php # Multi-attribute variant CRUD (getByProduct, getDistinctAttributes, getVariantByAttributes)
 │   │   ├── ReviewModel.php       # Reviews with rating summary
 │   │   └── UserModel.php
 │   └── Views/
 │       ├── admin/
 │       │   ├── product_form.php    # Full product form with gallery, features, specs
-│       │   ├── product_sizes.php   # Per-size stock management
-│       │   ├── reviews.php         # Review management list
+│   │   ├── product_sizes.php   # Per-size stock management
+│   │   ├── product_variants.php # Advanced variant management (multi-attribute combos)
+│   │   ├── reviews.php         # Review management list
 │       │   ├── review_reply.php    # Admin reply form
 │       │   └── user_form.php      # User edit with avatar upload
 │       ├── catalog/
@@ -484,7 +502,8 @@ pos-ci4/
 | `categories` | id, name, slug, icon | Product categories |
 | `products` | id, name, slug, description, category, price, stock, weight_grams, image, size, color, material, brand, dimension_length/width/height, warranty, features (JSON), specifications (JSON), care_instructions, video_url | Products with all attributes |
 | `product_images` | id, product_id (FK), image, sort_order | Gallery images |
-| `product_sizes` | id, product_id (FK), size, stock | Per-size stock |
+| `product_sizes` | id, product_id (FK), size, stock | Per-size stock (legacy) |
+| `product_variants` | id, product_id (FK), sku, price (nullable), stock, image, sort_order, attributes (JSON) | Multi-attribute product variants |
 | `product_reviews` | id, product_id (FK), user_id (FK), rating (1-5), review, reply, replied_at, replied_by (FK), status (approved/pending) | Product reviews |
 | `orders` | id, order_number, buyer_id (FK), payment_status, courier_name, shipping_address, biteship_order_id, tracking_number | Orders |
 | `order_items` | id, order_id (FK), product_id (FK), size, quantity, price, subtotal | Order line items |
@@ -551,6 +570,36 @@ app.baseURL = 'https://yourdomain.com'
 
 ---
 
+## Security
+
+### CSRF Protection
+
+Cross-Site Request Forgery (CSRF) protection is **enabled globally** via cookie-based tokens:
+
+- **Configuration**: `app/Config/Security.php` — `cookie` method, `X-CSRF-TOKEN` header name
+- **Forms**: All POST forms must include `<?= csrf_field() ?>`
+- **AJAX**: Fetch interceptor in all layouts reads `csrf_cookie_name` cookie and sends `X-CSRF-TOKEN` header on POST requests
+- **Cookie**: `csrf_cookie_name` — regenerated on each submission (`$regenerate = true`)
+
+### XSS Prevention
+
+All user-editable output is escaped with `<?= esc($var) ?>` throughout views:
+- Product names, descriptions, attributes
+- User names, emails, addresses
+- Review text, admin replies
+- Session flash messages (errors, success)
+- Order numbers, courier names
+- Form `old()` values
+- JavaScript output uses `esc($var, 'js')` encoding
+
+### API Key Security
+
+- API keys stored in `.env` (not committed to version control)
+- Midtrans callback cryptographically verified via `verifyNotification()`
+- Test API page (`/admin/test-api`) should be disabled in production
+
+---
+
 ## Directory Permissions
 
 ```
@@ -578,7 +627,8 @@ chown -R www-data:www-data writable public/uploads
 | `/orders` | GET | auth | My orders |
 | `/admin/dashboard` | GET | auth:owner | Admin dashboard |
 | `/admin/reviews` | GET | auth:owner | Review management |
-| `/admin/products/sizes/(:num)` | GET/POST | auth:owner | Per-size stock |
+| `/admin/products/sizes/(:num)` | GET/POST | auth:owner | Per-size stock (legacy) |
+| `/admin/products/variants/(:num)` | GET/POST | auth:owner | Advanced variant management (multi-attribute) |
 | `/admin/users/edit/(:num)` | GET/POST | auth:owner | Edit user with avatar |
 | `/product/review` | POST | — | Submit review |
 | `/profile/update` | POST | auth | Update profile |

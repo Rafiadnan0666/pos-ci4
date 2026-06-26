@@ -6,6 +6,7 @@ use App\Models\ProductModel;
 use App\Models\ReviewModel;
 use App\Models\ProductSizeModel;
 use App\Models\ProductImageModel;
+use App\Models\ProductVariantModel;
 
 class Catalog extends BaseController
 {
@@ -13,6 +14,7 @@ class Catalog extends BaseController
     private ReviewModel $reviewModel;
     private ProductSizeModel $sizeModel;
     private ProductImageModel $productImageModel;
+    private ProductVariantModel $variantModel;
 
     public function __construct()
     {
@@ -20,6 +22,7 @@ class Catalog extends BaseController
         $this->reviewModel       = model('App\Models\ReviewModel');
         $this->sizeModel         = model('App\Models\ProductSizeModel');
         $this->productImageModel = model('App\Models\ProductImageModel');
+        $this->variantModel      = model('App\Models\ProductVariantModel');
     }
 
     public function index()
@@ -64,6 +67,8 @@ class Catalog extends BaseController
         $reviews        = $this->reviewModel->getByProduct($product->id);
         $ratingSum      = $this->reviewModel->getRatingSummary($product->id);
         $galleryImages  = $this->productImageModel->getByProduct($product->id);
+        $variants       = $this->variantModel->getByProduct($product->id);
+        $variantAttrs   = $this->variantModel->getDistinctAttributes($product->id);
 
         $features = null;
         if (!empty($product->features)) {
@@ -89,6 +94,8 @@ class Catalog extends BaseController
             'features'      => $features,
             'specs'         => $specs,
             'hasReviewed'   => $hasReviewed,
+            'variants'      => $variants,
+            'variantAttrs'  => $variantAttrs,
         ]);
     }
 
@@ -105,7 +112,7 @@ class Catalog extends BaseController
         ];
 
         if (!$this->validate($rules)) {
-            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+            return redirect()->back()->withInput()->with('review_errors', $this->validator->getErrors());
         }
 
         $productId = (int) $this->request->getPost('product_id');

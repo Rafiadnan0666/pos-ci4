@@ -8,19 +8,43 @@
 
     <div class="neo-card mb-6" data-aos="fade-up">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-black"><?= $order->order_number ?></h2>
+            <h2 class="text-lg font-black"><?= esc($order->order_number) ?></h2>
             <span class="neo-badge <?= $order->payment_status === 'settlement' ? 'bg-neo-green' : 'bg-neo-yellow' ?>">
                 <?= strtoupper($order->payment_status) ?>
             </span>
         </div>
         <div class="space-y-2 text-sm">
-            <p><span class="font-bold">Name:</span> <?= $order->buyer_name ?? 'Customer' ?></p>
-            <p><span class="font-bold">Date:</span> <?= date('d M Y H:i', strtotime($order->created_at)) ?></p>
-            <?php if ($order->shipping_address): ?>
-            <p><span class="font-bold">Address:</span> <?= $order->shipping_address ?></p>
-            <p><span class="font-bold">Courier:</span> <?= $order->courier_name ?> - <?= $order->courier_service ?></p>
-            <?php endif; ?>
+            <p><span class="font-bold">👤 Buyer:</span> <?= esc($order->buyer_name ?? 'Customer') ?></p>
+            <p><span class="font-bold">📅 Date:</span> <?= date('d M Y H:i', strtotime($order->created_at)) ?></p>
         </div>
+
+        <?php if ($order->shipping_address): ?>
+        <div class="neo-divider my-4"></div>
+        <div class="bg-neo-yellow border-4 border-black p-4 -mx-4 -mx-4" style="margin-left:-1rem;margin-right:-1rem;">
+            <h3 class="font-black text-sm mb-3 flex items-center gap-2">
+                <span>📍</span> DELIVERY LOCATION
+            </h3>
+            <div class="space-y-2 text-sm">
+                <p>
+                    <span class="font-bold">Address:</span><br />
+                    <?= nl2br(esc($order->shipping_address)) ?>
+                </p>
+                <?php if (!empty($order->city_id)): ?>
+                <p><span class="font-bold">City:</span> <?= esc($order->city_id) ?></p>
+                <?php endif; ?>
+                <div class="flex flex-wrap gap-x-6 gap-y-1">
+                    <p><span class="font-bold">Courier:</span> <?= esc($order->courier_name) ?> - <?= esc($order->courier_service) ?></p>
+                    <p><span class="font-bold">Shipping Cost:</span> Rp <?= number_format($order->shipping_cost, 0, ',', '.') ?></p>
+                </div>
+                <?php if (!empty($order->tracking_number)): ?>
+                <p><span class="font-bold">📦 Tracking:</span> <?= esc($order->tracking_number) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($order->tracking_url)): ?>
+                <a href="<?= esc($order->tracking_url) ?>" target="_blank" class="neo-btn-cyan text-xs !px-3 !py-1.5 mt-2 inline-block">🔗 Track Shipment</a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="neo-divider my-4"></div>
 
@@ -36,7 +60,7 @@
             <tbody>
                 <?php foreach ($items as $item): ?>
                 <tr class="border-b-2 border-black">
-                    <td class="py-2 font-bold"><?= $item->name ?? 'Item' ?><?= !empty($item->size) ? ' <span class="text-xs opacity-60">(' . esc($item->size) . ')</span>' : '' ?></td>
+                    <td class="py-2 font-bold"><?= esc($item->name ?? 'Item') ?><?= !empty($item->size) ? ' <span class="text-xs opacity-60">(' . esc($item->size) . ')</span>' : '' ?></td>
                     <td class="py-2 text-center"><?= $item->quantity ?></td>
                     <td class="py-2 text-right">Rp <?= number_format($item->price, 0, ',', '.') ?></td>
                     <td class="py-2 text-right font-bold">Rp <?= number_format($item->subtotal, 0, ',', '.') ?></td>
@@ -66,13 +90,15 @@
 
     <?php if ($order->payment_status === 'pending'): ?>
     <div class="text-center space-x-3">
-        <button id="pay-now-btn" class="neo-btn-green" data-order="<?= $order->order_number ?>">
+        <button id="pay-now-btn" class="neo-btn-green" data-order="<?= esc($order->order_number) ?>">
             💳 Pay Now (Rp <?= number_format($order->gross_amount, 0, ',', '.') ?>)
         </button>
         <a href="<?= base_url('/') ?>" class="neo-btn-yellow">Back to Store</a>
     </div>
     <?php else: ?>
-    <a href="<?= base_url('/') ?>" class="neo-btn-yellow">Back to Store</a>
+    <div class="text-center">
+        <a href="<?= base_url('/') ?>" class="neo-btn-yellow">Back to Store</a>
+    </div>
     <?php endif; ?>
 </div>
 
@@ -93,21 +119,10 @@ document.getElementById('pay-now-btn')?.addEventListener('click', function() {
     .then(function(data) {
         if (data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
-                onSuccess: function() {
-                    location.reload();
-                },
-                onPending: function() {
-                    alert('Payment is pending. Please complete your payment.');
-                },
-                onError: function(result) {
-                    alert('Payment error: ' + (result.status_message || 'Unknown error'));
-                    btn.disabled = false;
-                    btn.textContent = '💳 Pay Now';
-                },
-                onClose: function() {
-                    btn.disabled = false;
-                    btn.textContent = '💳 Pay Now';
-                }
+                onSuccess: function() { location.reload(); },
+                onPending: function() { alert('Payment is pending. Please complete your payment.'); btn.disabled = false; btn.textContent = '💳 Pay Now'; },
+                onError: function(result) { alert('Payment error: ' + (result.status_message || 'Unknown error')); btn.disabled = false; btn.textContent = '💳 Pay Now'; },
+                onClose: function() { btn.disabled = false; btn.textContent = '💳 Pay Now'; }
             });
         } else {
             alert(data.error || 'Failed to load payment');
@@ -115,11 +130,7 @@ document.getElementById('pay-now-btn')?.addEventListener('click', function() {
             btn.textContent = '💳 Pay Now';
         }
     })
-    .catch(function() {
-        alert('Network error');
-        btn.disabled = false;
-        btn.textContent = '💳 Pay Now';
-    });
+    .catch(function() { alert('Network error'); btn.disabled = false; btn.textContent = '💳 Pay Now'; });
 });
 </script>
 <?php endif; ?>
