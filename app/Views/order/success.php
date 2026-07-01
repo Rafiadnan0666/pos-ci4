@@ -29,7 +29,7 @@
     <div class="neo-card mb-6" data-aos="fade-up">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-black">ORDER DETAILS</h2>
-            <span id="status-badge" class="neo-badge <?= $order->payment_status === 'settlement' ? 'bg-[#22C55E]' : 'bg-[#FFDE4D]' ?>">
+            <span id="status-badge" class="neo-badge <?= $order->payment_status === 'settlement' ? 'bg-neo-green' : 'bg-neo-yellow' ?>">
                 <?= strtoupper($order->payment_status) ?>
             </span>
         </div>
@@ -51,7 +51,7 @@
 
         <?php if ($order->shipping_address): ?>
         <div class="neo-divider my-4"></div>
-        <div class="bg-[#FFDE4D] border-4 border-black p-4 -mx-4" style="margin-left:-1rem;margin-right:-1rem;">
+        <div class="bg-neo-yellow border-4 border-black p-4" style="margin-left:-1rem;margin-right:-1rem;">
             <h3 class="font-black text-sm mb-3 flex items-center gap-2">
                 <span>📍</span> DELIVERY LOCATION
             </h3>
@@ -156,22 +156,24 @@ function payNow(orderNumber, btnEl) {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'order_number=' + encodeURIComponent(orderNumber)
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+        return r.json().catch(function() { return null; });
+    })
     .then(function(data) {
-        if (data.success && data.snap_token) {
+        if (data && data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
                 onSuccess: function() { location.reload(); },
-                onPending: function() { alert('Payment is pending.'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; },
-                onError: function() { alert('Payment error'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; },
+                onPending: function() { showAlert('Payment is pending.'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; },
+                onError: function() { showAlert('Payment error'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; },
                 onClose: function() { btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; }
             });
         } else {
-            alert(data.error || 'Failed to load payment');
+            showAlert((data && data.error) || 'Failed to load payment');
             btnEl.disabled = false;
             btnEl.textContent = '💳 Pay Now';
         }
     })
-    .catch(function() { alert('Network error'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; });
+    .catch(function() { showAlert('Network error'); btnEl.disabled = false; btnEl.textContent = '💳 Pay Now'; });
 }
 document.querySelectorAll('[id^="pay-now-success"]').forEach(function(btn) {
     btn.addEventListener('click', function() { payNow(this.dataset.order, this); });
@@ -185,12 +187,14 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'order_number=' + encodeURIComponent(this.dataset.order)
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) { location.reload(); }
-        else { btn.disabled = false; btn.textContent = '⚡ Simulate Payment (Sandbox Only)'; alert(data.error || 'Failed to simulate payment'); }
+    .then(function(r) {
+        return r.json().catch(function() { return null; });
     })
-    .catch(function() { btn.disabled = false; btn.textContent = '⚡ Simulate Payment (Sandbox Only)'; alert('Network error'); });
+    .then(function(data) {
+        if (data && data.success) { location.reload(); }
+        else { btn.disabled = false; btn.textContent = '⚡ Simulate Payment (Sandbox Only)'; showAlert((data && data.error) || 'Failed to simulate payment'); }
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = '⚡ Simulate Payment (Sandbox Only)'; showAlert('Network error'); });
 });
 
 (function pollStatus() {
@@ -209,7 +213,7 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
                 document.getElementById('status-badge').textContent = 'SETTLEMENT';
-                document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
+                document.getElementById('status-badge').className = 'neo-badge bg-neo-green';
                 return;
             } else {
                 document.getElementById('status-icon').textContent = '❌';
@@ -217,7 +221,7 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT FAILED';
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold text-white">Payment ' + verifyData.status + ' — please try again.</span>';
                 document.getElementById('status-badge').textContent = verifyData.status.toUpperCase();
-                document.getElementById('status-badge').className = 'neo-badge bg-[#EF4444] text-white';
+                document.getElementById('status-badge').className = 'neo-badge bg-neo-red text-white';
                 return;
             }
         }
@@ -231,14 +235,14 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
                 document.getElementById('status-badge').textContent = 'SETTLEMENT';
-                document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
+                document.getElementById('status-badge').className = 'neo-badge bg-neo-green';
             } else if (data.status === 'expire' || data.status === 'deny') {
                 document.getElementById('status-icon').textContent = '❌';
                 document.getElementById('status-card').className = 'neo-card-orange';
                 document.getElementById('status-card').querySelector('h1').textContent = 'PAYMENT FAILED';
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold text-white">Payment ' + data.status + ' — please try again.</span>';
                 document.getElementById('status-badge').textContent = data.status.toUpperCase();
-                document.getElementById('status-badge').className = 'neo-badge bg-[#EF4444] text-white';
+                document.getElementById('status-badge').className = 'neo-badge bg-neo-red text-white';
             } else { setTimeout(pollStatus, 3000); }
         })
         .catch(function() { setTimeout(pollStatus, 5000); });
@@ -254,7 +258,7 @@ document.getElementById('simulate-payment')?.addEventListener('click', function(
                 document.getElementById('status-card').querySelector('p').textContent = 'Your payment has been confirmed. Thank you!';
                 document.getElementById('status-polling').innerHTML = '<span class="text-sm font-bold">✅ Payment confirmed!</span>';
                 document.getElementById('status-badge').textContent = 'SETTLEMENT';
-                document.getElementById('status-badge').className = 'neo-badge bg-[#22C55E]';
+                document.getElementById('status-badge').className = 'neo-badge bg-neo-green';
             } else { setTimeout(pollStatus, 5000); }
         })
         .catch(function() { setTimeout(pollStatus, 5000); });

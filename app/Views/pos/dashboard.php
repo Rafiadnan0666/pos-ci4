@@ -143,7 +143,7 @@
 </div>
 
 <!-- Variant Selection Modal -->
-<div id="variant-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden" style="background:rgba(0,0,0,0.6);">
+<div id="variant-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
     <div class="bg-white border-4 border-black shadow-neo w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-center gap-3">
@@ -201,12 +201,14 @@ window.posVariants = <?= json_encode($jsVariants) ?>;
 document.getElementById('pos-checkout-form')?.addEventListener('submit', function (e) {
     var btn = e.submitter;
     if (btn && btn.id === 'cash-checkout-btn') {
-        if (!confirm('Confirm cash payment for this order?')) {
-            e.preventDefault();
-            return;
-        }
-        btn.disabled = true;
-        btn.textContent = 'Processing...';
+        e.preventDefault();
+        var form = this;
+        showConfirm('Confirm cash payment for this order?').then(function (confirmed) {
+            if (!confirmed) return;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            form.submit();
+        });
     }
 });
 
@@ -215,52 +217,56 @@ document.getElementById('payment-link-btn')?.addEventListener('click', function 
     var name = form.querySelector('[name="buyer_name"]').value || 'Walk-in Customer';
     var phone = form.querySelector('[name="buyer_phone"]').value || '-';
 
-    if (!confirm('Send payment link for this order?')) return;
-
     var btn = this;
-    btn.disabled = true;
-    btn.textContent = 'Processing...';
+    showConfirm('Send payment link for this order?').then(function (confirmed) {
+        if (!confirmed) return;
 
-    var formData = new FormData();
-    formData.append('buyer_name', name);
-    formData.append('buyer_phone', phone);
-    formData.append('payment_method', 'payment_link');
+        btn.disabled = true;
+        btn.textContent = 'Processing...';
 
-    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (csrfMeta && window.csrfTokenName) formData.append(window.csrfTokenName, csrfMeta.content);
+        var formData = new FormData();
+        formData.append('buyer_name', name);
+        formData.append('buyer_phone', phone);
+        formData.append('payment_method', 'payment_link');
 
-    fetch('<?= base_url('pos/checkout') ?>', {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: formData
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-        if (data.success && data.snap_token) {
-            window.snap.pay(data.snap_token, {
-                onSuccess: function () {
-                    location.reload();
-                },
-                onPending: function () {
-                    alert('Payment is pending.');
-                    btn.disabled = false;
-                    btn.textContent = '🔗 QRIS';
-                },
-                onClose: function () {
-                    btn.disabled = false;
-                    btn.textContent = '🔗 QRIS';
-                }
-            });
-        } else {
-            alert(data.error || 'Payment failed');
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && window.csrfTokenName) formData.append(window.csrfTokenName, csrfMeta.content);
+
+        fetch('<?= base_url('pos/checkout') ?>', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(function (r) {
+            return r.json().catch(function () { return null; });
+        })
+        .then(function (data) {
+            if (data && data.success && data.snap_token) {
+                window.snap.pay(data.snap_token, {
+                    onSuccess: function () {
+                        location.reload();
+                    },
+                    onPending: function () {
+                        showAlert('Payment is pending.');
+                        btn.disabled = false;
+                        btn.textContent = '🔗 QRIS';
+                    },
+                    onClose: function () {
+                        btn.disabled = false;
+                        btn.textContent = '🔗 QRIS';
+                    }
+                });
+            } else {
+                showAlert((data && data.error) || 'Payment failed');
+                btn.disabled = false;
+                btn.textContent = '🔗 QRIS';
+            }
+        })
+        .catch(function () {
+            showAlert('Payment failed');
             btn.disabled = false;
             btn.textContent = '🔗 QRIS';
-        }
-    })
-    .catch(function () {
-        alert('An error occurred');
-        btn.disabled = false;
-        btn.textContent = '🔗 QRIS';
+        });
     });
 });
 
@@ -406,11 +412,11 @@ modalQtyInc.addEventListener('click', function() {
 modalAddCart.addEventListener('click', function() {
     if (this.disabled) return;
     var match = findMatchingVariant();
-    if (!match) { alert('Please select all attributes'); return; }
+    if (!match) { showAlert('Please select all attributes'); return; }
 
     var qty = parseInt(modalQty.textContent);
     var mStock = match.stock || 0;
-    if (qty < 1 || qty > mStock) { alert('Invalid quantity'); return; }
+    if (qty < 1 || qty > mStock) { showAlert('Invalid quantity'); return; }
 
     var formData = new FormData();
     formData.append('product_id', currentModalProductId);
@@ -425,16 +431,18 @@ modalAddCart.addEventListener('click', function() {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+        return r.json().catch(function() { return null; });
+    })
     .then(function(data) {
-        if (data.success) {
+        if (data && data.success) {
             closeModal();
             location.reload();
         } else {
-            alert(data.error || 'Unknown error');
+            showAlert((data && data.error) || 'Failed to add item');
         }
     })
-    .catch(function() { alert('An error occurred'); });
+    .catch(function() { showAlert('Failed to add item'); });
 });
 </script>
 <?= $this->endSection() ?>

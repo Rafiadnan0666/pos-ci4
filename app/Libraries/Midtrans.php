@@ -37,7 +37,7 @@ class Midtrans
                 'id'       => (string) $item['id'],
                 'price'    => (int) $item['price'],
                 'quantity' => (int) $item['quantity'],
-                'name'     => $item['name'],
+                'name'     => mb_substr($item['name'], 0, 50),
             ];
         }
 

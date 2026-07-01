@@ -51,7 +51,7 @@
                         <input type="text" id="city_search" class="neo-input" placeholder="Type city name..." autocomplete="off" />
                         <div id="city_results" class="hidden mt-1 border-4 border-black bg-white max-h-40 overflow-y-auto"></div>
                         <input type="hidden" id="city_id" />
-                        <p id="shipping-error" class="text-sm font-bold mt-2 hidden text-[#EF4444]"></p>
+                        <p id="shipping-error" class="text-sm font-bold mt-2 hidden text-neo-red"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -80,7 +80,7 @@
                         </div>
                         <input type="hidden" id="latitude" value="" />
                         <input type="hidden" id="longitude" value="" />
-                        <p id="location-status" class="text-xs font-bold mt-1 text-[#22C55E] hidden">📍 Location pinned</p>
+                        <p id="location-status" class="text-xs font-bold mt-1 text-neo-green hidden">📍 Location pinned</p>
                     </div>
                 </div>
             </div>
@@ -149,7 +149,7 @@
                 <input type="hidden" id="courier-name-val" value="" />
                 <input type="hidden" id="courier-service-val" value="" />
 
-                <div id="validation-errors" class="hidden mt-3 bg-[#EF4444] text-white border-4 border-black p-3 text-sm font-bold"></div>
+                <div id="validation-errors" class="hidden mt-3 bg-neo-red text-white border-4 border-black p-3 text-sm font-bold"></div>
 
                 <button id="pay-now" class="neo-btn-green w-full mt-4 text-base" disabled>
                     💳 PAY NOW
@@ -231,7 +231,7 @@ function reverseGeocode(lat, lng) {
 
 document.getElementById('use-current-location')?.addEventListener('click', function() {
     if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser');
+        showAlert('Geolocation is not supported by your browser');
         return;
     }
     this.textContent = '📍 Locating...';
@@ -249,7 +249,7 @@ document.getElementById('use-current-location')?.addEventListener('click', funct
             }, 3000);
         },
         function(err) {
-            alert('Could not get location: ' + err.message);
+            showAlert('Could not get location: ' + err.message);
             document.getElementById('use-current-location').textContent = '📡 Use My Location';
             document.getElementById('use-current-location').disabled = false;
         },
@@ -289,7 +289,7 @@ document.getElementById('city_search').addEventListener('input', function () {
             container.classList.remove('hidden');
             data.forEach(function (place) {
                 const div = document.createElement('div');
-                div.className = 'p-3 border-b-2 border-black cursor-pointer hover:bg-[#FFDE4D] font-bold text-sm';
+                div.className = 'p-3 border-b-2 border-black cursor-pointer hover:bg-neo-yellow font-bold text-sm';
                 div.textContent = place.display_name;
                 div.dataset.postalCode = place.address?.postcode || '';
                 div.dataset.city = place.address?.city || place.address?.town || place.address?.county || '';
@@ -378,12 +378,12 @@ document.getElementById('get-rates').addEventListener('click', function () {
         btn.disabled = false;
 
         if (!data.success) {
-            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">⚠️ ' + (data.error || 'No rates found for the selected couriers.') + '</p>';
+            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-neo-red">⚠️ ' + (data.error || 'No rates found for the selected couriers.') + '</p>';
             return;
         }
 
         if (!data.rates || data.rates.length === 0) {
-            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">⚠️ No courier rates available for this destination. Try a different postal code.</p>';
+            document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-neo-red">⚠️ No courier rates available for this destination. Try a different postal code.</p>';
             return;
         }
 
@@ -393,7 +393,7 @@ document.getElementById('get-rates').addEventListener('click', function () {
     .catch(function () {
         document.getElementById('rates-loading').classList.add('hidden');
         btn.disabled = false;
-        document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-[#EF4444]">⚠️ Network error — check your connection and try again.</p>';
+        document.getElementById('rates-list').innerHTML = '<p class="text-sm font-bold text-neo-red">⚠️ Network error — check your connection and try again.</p>';
     });
 });
 
@@ -504,9 +504,11 @@ document.getElementById('pay-now').addEventListener('click', function () {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData
     })
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+        return r.json().catch(function () { return null; });
+    })
     .then(function (data) {
-        if (data.success && data.snap_token) {
+        if (data && data.success && data.snap_token) {
             window.snap.pay(data.snap_token, {
                 onSuccess: function (result) {
                     fetch('<?= base_url('payment/verifyStatus') ?>', {
@@ -536,7 +538,7 @@ document.getElementById('pay-now').addEventListener('click', function () {
                 }
             });
         } else {
-            errEl.innerHTML = '⚠️ ' + (data.error || 'Payment failed');
+            errEl.innerHTML = '⚠️ ' + ((data && data.error) || 'Payment failed');
             errEl.classList.remove('hidden');
             btn.disabled = false;
             btn.textContent = '💳 PAY NOW';

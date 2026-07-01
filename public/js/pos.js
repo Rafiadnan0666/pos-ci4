@@ -46,22 +46,30 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('clear-cart')?.addEventListener('click', function () {
-        if (!confirm('Clear entire cart?')) return;
-        var params = new URLSearchParams();
-        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-        if (csrfMeta && window.csrfTokenName) {
-            params.append(window.csrfTokenName, csrfMeta.content);
-        }
-        fetch('/pos/clearCart', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: params.toString()
-        }).then(function (r) { return r.json(); }).then(function (data) {
-            if (data.success) location.reload();
-        }).catch(function () { alert('An error occurred'); });
+        var self = this;
+        showConfirm('Clear entire cart?').then(function (confirmed) {
+            if (!confirmed) return;
+            var params = new URLSearchParams();
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            if (csrfMeta && window.csrfTokenName) {
+                params.append(window.csrfTokenName, csrfMeta.content);
+            }
+            fetch('/pos/clearCart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: params.toString()
+            })
+            .then(function (r) {
+                return r.json().catch(function () { return null; });
+            })
+            .then(function (data) {
+                if (data && data.success) location.reload();
+            })
+            .catch(function () {});
+        });
     });
 
     function addToCart(productId, variantId) {
@@ -81,15 +89,17 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: params.toString()
         })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+            return r.json().catch(function () { return null; });
+        })
         .then(function (data) {
-            if (data.success) {
+            if (data && data.success) {
                 location.reload();
             } else {
-                alert(data.error);
+                showAlert((data && data.error) || 'Failed to add item');
             }
         })
-        .catch(function () { alert('An error occurred'); });
+        .catch(function () { showAlert('Failed to add item'); });
     }
 
     function updateCartItem(cartKey, newQuantity) {
@@ -114,44 +124,51 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: params.toString()
         })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+            return r.json().catch(function () { return null; });
+        })
         .then(function (data) {
-            if (data.success) {
+            if (data && data.success) {
                 location.reload();
             } else {
-                alert(data.error);
+                showAlert((data && data.error) || 'Failed to update cart');
             }
         })
-        .catch(function () { alert('An error occurred'); });
+        .catch(function () { showAlert('Failed to update cart'); });
     }
 
     function removeCartItem(cartKey) {
-        if (!confirm('Remove this item?')) return;
+        var self = this;
+        showConfirm('Remove this item?').then(function (confirmed) {
+            if (!confirmed) return;
 
-        var params = new URLSearchParams();
-        params.append('cart_key', cartKey);
-        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-        if (csrfMeta && window.csrfTokenName) {
-            params.append(window.csrfTokenName, csrfMeta.content);
-        }
-
-        fetch('/pos/removeFromCart', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: params.toString()
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert(data.error);
+            var params = new URLSearchParams();
+            params.append('cart_key', cartKey);
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            if (csrfMeta && window.csrfTokenName) {
+                params.append(window.csrfTokenName, csrfMeta.content);
             }
-        })
-        .catch(function () { alert('An error occurred'); });
+
+            fetch('/pos/removeFromCart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: params.toString()
+            })
+            .then(function (r) {
+                return r.json().catch(function () { return null; });
+            })
+            .then(function (data) {
+                if (data && data.success) {
+                    location.reload();
+                } else {
+                    showAlert((data && data.error) || 'Failed to remove item');
+                }
+            })
+            .catch(function () { showAlert('Failed to remove item'); });
+        });
     }
 
     function updateClock() {

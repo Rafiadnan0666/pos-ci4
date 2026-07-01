@@ -57,16 +57,16 @@
     </header>
 
     <?php if (session()->has('message')): ?>
-    <div class="max-w-full mx-auto" style="padding:0 1rem;margin-top:1rem;">
-        <div style="background:#22C55E;border:4px solid #000;box-shadow:4px 4px 0px 0px rgba(0,0,0,1);padding:1rem;display:flex;align-items:center;gap:.75rem;font-weight:700;font-size:.875rem;">
+    <div class="max-w-full mx-auto px-4 mt-4">
+        <div class="neo-card-green flex items-center gap-3">
             <span>✓</span> <?= esc(session('message')) ?>
         </div>
     </div>
     <?php endif; ?>
 
     <?php if (session()->has('error')): ?>
-    <div class="max-w-full mx-auto" style="padding:0 1rem;margin-top:1rem;">
-        <div style="background:#F97316;color:#fff;border:4px solid #000;box-shadow:4px 4px 0px 0px rgba(0,0,0,1);padding:1rem;display:flex;align-items:center;gap:.75rem;font-weight:700;font-size:.875rem;">
+    <div class="max-w-full mx-auto px-4 mt-4">
+        <div class="neo-card-orange flex items-center gap-3">
             <span>✕</span> <?= esc(session('error')) ?>
         </div>
     </div>
@@ -74,25 +74,95 @@
 
     <?= $this->renderSection('content') ?>
 
+    <!-- Custom Neo Modal -->
+    <div id="neo-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] hidden">
+        <div class="bg-white border-4 border-black shadow-neo w-full max-w-sm mx-4 p-6" data-aos="zoom-in">
+            <div class="flex items-center gap-3 mb-4">
+                <span id="neo-modal-icon" class="text-2xl">⚠️</span>
+                <h3 id="neo-modal-title" class="font-heading font-bold text-lg">Confirm</h3>
+            </div>
+            <p id="neo-modal-message" class="text-sm font-bold mb-6"></p>
+            <div id="neo-modal-actions" class="flex gap-2 justify-end">
+                <button id="neo-modal-cancel" class="neo-btn-white text-sm hidden">Cancel</button>
+                <button id="neo-modal-confirm" class="neo-btn-cyan text-sm">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    window.showModal = function(opts) {
+        return new Promise(function(resolve) {
+            var modal = document.getElementById('neo-modal');
+            var titleEl = document.getElementById('neo-modal-title');
+            var msgEl = document.getElementById('neo-modal-message');
+            var iconEl = document.getElementById('neo-modal-icon');
+            var actionsEl = document.getElementById('neo-modal-actions');
+            var confirmBtn = document.getElementById('neo-modal-confirm');
+            var cancelBtn = document.getElementById('neo-modal-cancel');
+
+            titleEl.textContent = opts.title || 'Confirm';
+            msgEl.textContent = opts.message || '';
+            iconEl.textContent = opts.icon || '⚠️';
+            confirmBtn.textContent = opts.confirmText || (opts.type === 'alert' ? 'OK' : 'Yes');
+            confirmBtn.className = (opts.confirmClass || 'neo-btn-cyan') + ' text-sm';
+
+            if (opts.type === 'alert') {
+                cancelBtn.classList.add('hidden');
+            } else {
+                cancelBtn.classList.remove('hidden');
+                cancelBtn.textContent = opts.cancelText || 'Cancel';
+            }
+
+            modal.classList.remove('hidden');
+
+            function cleanup() {
+                modal.classList.add('hidden');
+                confirmBtn.onclick = null;
+                cancelBtn.onclick = null;
+            }
+
+            confirmBtn.onclick = function() { cleanup(); resolve(true); };
+            cancelBtn.onclick = function() { cleanup(); resolve(false); };
+            modal.addEventListener('click', function handler(e) {
+                if (e.target === modal) { cleanup(); modal.removeEventListener('click', handler); resolve(false); }
+            });
+        });
+    };
+
+    window.showConfirm = function(message) {
+        return window.showModal({ type: 'confirm', title: 'Confirm', message: message, icon: '⚠️', confirmText: 'Yes', confirmClass: 'neo-btn-green', cancelText: 'Cancel' });
+    };
+
+    window.showAlert = function(message, title) {
+        return window.showModal({ type: 'alert', title: title || 'Notice', message: message, icon: 'ℹ️', confirmText: 'OK', confirmClass: 'neo-btn-cyan' });
+    };
+    </script>
+
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ duration: 400, once: true });</script>
     <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="<?= trim(env('MIDTRANS_CLIENT_KEY', '')) ?>"></script>
     <script>
     window.csrfTokenName = '<?= csrf_token() ?>';
     (function() {
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        const token = meta ? meta.content : '';
-        if (token) {
-            const origFetch = window.fetch;
-            window.fetch = function(url, opts) {
-                opts = opts || {};
-                opts.headers = opts.headers || {};
-                if (opts.method && opts.method.toUpperCase() === 'POST') {
-                    opts.headers['X-CSRF-TOKEN'] = token;
+        const origFetch = window.fetch;
+        window.fetch = function(url, opts) {
+            opts = opts || {};
+            opts.headers = opts.headers || {};
+            if (opts.method && opts.method.toUpperCase() === 'POST') {
+                var meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta && meta.content) {
+                    opts.headers['X-CSRF-TOKEN'] = meta.content;
                 }
-                return origFetch.call(this, url, opts);
-            };
-        }
+            }
+            return origFetch.call(this, url, opts).then(function(response) {
+                var newToken = response.headers.get('X-CSRF-TOKEN') || response.headers.get('csrf-token');
+                if (newToken) {
+                    var meta = document.querySelector('meta[name="csrf-token"]');
+                    if (meta) meta.content = newToken;
+                }
+                return response;
+            });
+        };
     })();
     </script>
     <script src="<?= base_url('js/pos.js') ?>"></script>

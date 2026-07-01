@@ -63,6 +63,69 @@
         <?= $this->renderSection('content') ?>
     </main>
 
+    <!-- Custom Neo Modal -->
+    <div id="neo-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] hidden">
+        <div class="bg-white border-4 border-black shadow-neo w-full max-w-sm mx-4 p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <span id="neo-modal-icon" class="text-2xl">⚠️</span>
+                <h3 id="neo-modal-title" class="font-heading font-bold text-lg">Confirm</h3>
+            </div>
+            <p id="neo-modal-message" class="text-sm font-bold mb-6"></p>
+            <div id="neo-modal-actions" class="flex gap-2 justify-end">
+                <button id="neo-modal-cancel" class="neo-btn-white text-sm hidden">Cancel</button>
+                <button id="neo-modal-confirm" class="neo-btn-cyan text-sm">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    window.showModal = function(opts) {
+        return new Promise(function(resolve) {
+            var modal = document.getElementById('neo-modal');
+            var titleEl = document.getElementById('neo-modal-title');
+            var msgEl = document.getElementById('neo-modal-message');
+            var iconEl = document.getElementById('neo-modal-icon');
+            var confirmBtn = document.getElementById('neo-modal-confirm');
+            var cancelBtn = document.getElementById('neo-modal-cancel');
+
+            titleEl.textContent = opts.title || 'Confirm';
+            msgEl.textContent = opts.message || '';
+            iconEl.textContent = opts.icon || '⚠️';
+            confirmBtn.textContent = opts.confirmText || (opts.type === 'alert' ? 'OK' : 'Yes');
+            confirmBtn.className = (opts.confirmClass || 'neo-btn-cyan') + ' text-sm';
+
+            if (opts.type === 'alert') {
+                cancelBtn.classList.add('hidden');
+            } else {
+                cancelBtn.classList.remove('hidden');
+                cancelBtn.textContent = opts.cancelText || 'Cancel';
+            }
+
+            modal.classList.remove('hidden');
+
+            function cleanup() {
+                modal.classList.add('hidden');
+                confirmBtn.onclick = null;
+                cancelBtn.onclick = null;
+            }
+
+            confirmBtn.onclick = function() { cleanup(); resolve(true); };
+            cancelBtn.onclick = function() { cleanup(); resolve(false); };
+            modal.addEventListener('click', function handler(e) {
+                if (e.target === modal) { cleanup(); modal.removeEventListener('click', handler); resolve(false); }
+            });
+        });
+    };
+
+    window.showConfirm = function(message) {
+        return window.showModal({ type: 'confirm', title: 'Confirm', message: message, icon: '⚠️', confirmText: 'Yes', confirmClass: 'neo-btn-green', cancelText: 'Cancel' });
+    };
+
+    window.showAlert = function(message, title) {
+        return window.showModal({ type: 'alert', title: title || 'Notice', message: message, icon: 'ℹ️', confirmText: 'OK', confirmClass: 'neo-btn-cyan' });
+    };
+    </script>
+
     <footer class="bg-black text-white border-t-4 border-black mt-12">
         <div class="max-w-7xl mx-auto px-4 py-8">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -96,21 +159,25 @@
     <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="<?= env('MIDTRANS_CLIENT_KEY') ?>"></script>
     <script>
     (function() {
-        const csrfCookie = document.cookie.split(';').find(c => c.trim().startsWith('csrf_cookie_name='));
-        if (csrfCookie) {
-            const token = csrfCookie.split('=')[1];
-            const meta = document.querySelector('meta[name="csrf-token"]');
-            if (meta) meta.content = token;
-            const origFetch = window.fetch;
-            window.fetch = function(url, opts) {
-                opts = opts || {};
-                opts.headers = opts.headers || {};
-                if (opts.method && opts.method.toUpperCase() === 'POST') {
-                    opts.headers['X-CSRF-TOKEN'] = token;
+        const origFetch = window.fetch;
+        window.fetch = function(url, opts) {
+            opts = opts || {};
+            opts.headers = opts.headers || {};
+            if (opts.method && opts.method.toUpperCase() === 'POST') {
+                var meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta && meta.content) {
+                    opts.headers['X-CSRF-TOKEN'] = meta.content;
                 }
-                return origFetch.call(this, url, opts);
-            };
-        }
+            }
+            return origFetch.call(this, url, opts).then(function(response) {
+                var newToken = response.headers.get('X-CSRF-TOKEN') || response.headers.get('csrf-token');
+                if (newToken) {
+                    var meta = document.querySelector('meta[name="csrf-token"]');
+                    if (meta) meta.content = newToken;
+                }
+                return response;
+            });
+        };
     })();
     </script>
     <script src="<?= base_url('js/store.js') ?>"></script>
