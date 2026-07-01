@@ -47,16 +47,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('clear-cart')?.addEventListener('click', function () {
         if (!confirm('Clear entire cart?')) return;
+        var params = new URLSearchParams();
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && window.csrfTokenName) {
+            params.append(window.csrfTokenName, csrfMeta.content);
+        }
         fetch('/pos/clearCart', {
             method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(function () { location.reload(); });
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: params.toString()
+        }).then(function (r) { return r.json(); }).then(function (data) {
+            if (data.success) location.reload();
+        }).catch(function () { alert('An error occurred'); });
     });
 
     function addToCart(productId, variantId) {
         var params = new URLSearchParams();
         params.append('product_id', productId);
         params.append('variant_id', variantId);
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && window.csrfTokenName) {
+            params.append(window.csrfTokenName, csrfMeta.content);
+        }
 
         fetch('/pos/addToCart', {
             method: 'POST',
@@ -73,7 +88,8 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 alert(data.error);
             }
-        });
+        })
+        .catch(function () { alert('An error occurred'); });
     }
 
     function updateCartItem(cartKey, newQuantity) {
@@ -85,6 +101,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var params = new URLSearchParams();
         params.append('cart_key', cartKey);
         params.append('quantity', newQuantity);
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && window.csrfTokenName) {
+            params.append(window.csrfTokenName, csrfMeta.content);
+        }
 
         fetch('/pos/updateCart', {
             method: 'POST',
@@ -101,7 +121,8 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 alert(data.error);
             }
-        });
+        })
+        .catch(function () { alert('An error occurred'); });
     }
 
     function removeCartItem(cartKey) {
@@ -109,6 +130,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var params = new URLSearchParams();
         params.append('cart_key', cartKey);
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && window.csrfTokenName) {
+            params.append(window.csrfTokenName, csrfMeta.content);
+        }
 
         fetch('/pos/removeFromCart', {
             method: 'POST',
@@ -122,8 +147,11 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(function (data) {
             if (data.success) {
                 location.reload();
+            } else {
+                alert(data.error);
             }
-        });
+        })
+        .catch(function () { alert('An error occurred'); });
     }
 
     function updateClock() {

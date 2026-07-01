@@ -27,7 +27,7 @@
             <div class="space-y-4" id="variants-container">
                 <?php if ($hasVariants): ?>
                 <?php foreach ($variants as $i => $v):
-                    $vAttrs = json_decode($v->attributes, true) ?? [];
+                    $vAttrs = json_decode($v->attributes ?? '{}', true) ?? [];
                     $attrNames = array_keys($vAttrs);
                     $attrValues = array_values($vAttrs);
                 ?>
@@ -64,7 +64,7 @@
                         </div>
                     </div>
                     <?php
-                    $previewAttrs = json_decode($v->attributes, true) ?? [];
+                    $previewAttrs = json_decode($v->attributes ?? '{}', true) ?? [];
                     if (!empty($previewAttrs)):
                     ?>
                     <div class="mt-2 flex gap-1 flex-wrap">

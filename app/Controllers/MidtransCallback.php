@@ -77,10 +77,11 @@ class MidtransCallback extends BaseController
                     $this->variantModel->set('stock', "stock + {$item->quantity}", false)
                         ->where('id', $item->variant_id)
                         ->update();
+                } else {
+                    $this->productModel->set('stock', "stock + {$item->quantity}", false)
+                        ->where('id', $item->product_id)
+                        ->update();
                 }
-                $this->productModel->set('stock', "stock + {$item->quantity}", false)
-                    ->where('id', $item->product_id)
-                    ->update();
             }
         }
 
@@ -96,8 +97,9 @@ class MidtransCallback extends BaseController
                 $this->variantModel->where('id', $item->variant_id)
                     ->set('stock', "stock - {$item->quantity}", false)
                     ->update();
+            } else {
+                $this->productModel->decrementStock($item->product_id, $item->quantity);
             }
-            $this->productModel->decrementStock($item->product_id, $item->quantity);
         }
 
         if (!$order->courier_name || !$order->shipping_address) {

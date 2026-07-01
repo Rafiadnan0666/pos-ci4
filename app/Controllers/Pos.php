@@ -91,7 +91,7 @@ class Pos extends BaseController
                 ->findAll();
             foreach ($allVariants as $v) {
                 $variantsByProduct[$v->product_id][] = $v;
-                $vAttrs = json_decode($v->attributes, true) ?? [];
+                $vAttrs = json_decode($v->attributes ?? '{}', true) ?? [];
                 if (!isset($variantAttrsByProduct[$v->product_id])) {
                     $variantAttrsByProduct[$v->product_id] = [];
                 }
@@ -147,10 +147,10 @@ class Pos extends BaseController
             $variantData[] = [
                 'id'         => $v->id,
                 'sku'        => $v->sku,
-                'price'      => $v->price ? (float) $v->price : null,
+                'price'      => $v->price !== null ? (float) $v->price : null,
                 'stock'      => (int) $v->stock,
                 'image'      => $v->image,
-                'attributes' => json_decode($v->attributes, true) ?? [],
+                'attributes' => json_decode($v->attributes ?? '{}', true) ?? [],
             ];
         }
 
@@ -193,8 +193,8 @@ class Pos extends BaseController
             $variant = $this->variantModel->find($variantId);
             if ($variant && $variant->product_id == $productId) {
                 $finalStock = (int) $variant->stock;
-                $finalPrice = $variant->price ? (float) $variant->price : $finalPrice;
-                $vAttrs = json_decode($variant->attributes, true) ?? [];
+                $finalPrice = $variant->price !== null ? (float) $variant->price : $finalPrice;
+                $vAttrs = json_decode($variant->attributes ?? '{}', true) ?? [];
                 $attrParts = [];
                 foreach ($vAttrs as $k => $v) { $attrParts[] = "$k: $v"; }
                 $variantLabel = implode(', ', $attrParts);

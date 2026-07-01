@@ -42,7 +42,7 @@ class ProductVariantModel extends Model
     {
         $variants = $this->getByProduct($productId);
         foreach ($variants as $v) {
-            $vAttrs = json_decode($v->attributes, true) ?? [];
+            $vAttrs = json_decode($v->attributes ?? '{}', true) ?? [];
             $match = true;
             foreach ($attributes as $key => $val) {
                 if (!isset($vAttrs[$key]) || $vAttrs[$key] !== $val) {
@@ -60,7 +60,7 @@ class ProductVariantModel extends Model
         $variants = $this->getByProduct($productId);
         $attrs = [];
         foreach ($variants as $v) {
-            $vAttrs = json_decode($v->attributes, true) ?? [];
+            $vAttrs = json_decode($v->attributes ?? '{}', true) ?? [];
             foreach ($vAttrs as $key => $val) {
                 if (!isset($attrs[$key])) $attrs[$key] = [];
                 if (!in_array($val, $attrs[$key])) $attrs[$key][] = $val;

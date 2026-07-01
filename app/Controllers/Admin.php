@@ -878,7 +878,7 @@ class Admin extends BaseController
                         $this->variantModel->insert([
                             'product_id' => $productId,
                             'sku'        => $v['sku'] ?? null,
-                            'price'      => !empty($v['price']) ? (float) $v['price'] : null,
+                            'price'      => ($v['price'] !== null && $v['price'] !== '') ? (float) $v['price'] : null,
                             'stock'      => (int) ($v['stock'] ?? 0),
                             'image'      => $v['image'] ?? null,
                             'sort_order' => (int) ($v['sort_order'] ?? 0),
@@ -897,7 +897,7 @@ class Admin extends BaseController
         // Collect all attribute names across variants
         $allAttrNames = [];
         foreach ($variants as $v) {
-            $attrs = json_decode($v->attributes, true) ?? [];
+            $attrs = json_decode($v->attributes ?? '{}', true) ?? [];
             foreach (array_keys($attrs) as $k) {
                 if (!in_array($k, $allAttrNames)) $allAttrNames[] = $k;
             }

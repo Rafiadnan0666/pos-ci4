@@ -57,8 +57,8 @@ class Cart extends BaseController
             $variant = $this->variantModel->find($variantId);
             if ($variant && $variant->product_id == $productId) {
                 $finalStock = $variant->stock;
-                $finalPrice = $variant->price ? (float) $variant->price : $finalPrice;
-                $vAttrs = json_decode($variant->attributes, true) ?? [];
+                $finalPrice = $variant->price !== null ? (float) $variant->price : $finalPrice;
+                $vAttrs = json_decode($variant->attributes ?? '{}', true) ?? [];
                 $attrParts = [];
                 foreach ($vAttrs as $k => $v) { $attrParts[] = "$k: $v"; }
                 $variantLabel = implode(', ', $attrParts);

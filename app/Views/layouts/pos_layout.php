@@ -78,12 +78,11 @@
     <script>AOS.init({ duration: 400, once: true });</script>
     <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="<?= trim(env('MIDTRANS_CLIENT_KEY', '')) ?>"></script>
     <script>
+    window.csrfTokenName = '<?= csrf_token() ?>';
     (function() {
-        const csrfCookie = document.cookie.split(';').find(c => c.trim().startsWith('csrf_cookie_name='));
-        if (csrfCookie) {
-            const token = csrfCookie.split('=')[1];
-            const meta = document.querySelector('meta[name="csrf-token"]');
-            if (meta) meta.content = token;
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        const token = meta ? meta.content : '';
+        if (token) {
             const origFetch = window.fetch;
             window.fetch = function(url, opts) {
                 opts = opts || {};

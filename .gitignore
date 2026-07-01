@@ -37,6 +37,12 @@ $RECYCLE.BIN/
 .Trash-*
 
 #-------------------------
+# User Uploads
+#-------------------------
+/public/uploads/*
+!/public/uploads/.htaccess
+
+#-------------------------
 # Environment Files
 #-------------------------
 # These should never be under version control,

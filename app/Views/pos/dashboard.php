@@ -185,9 +185,9 @@ foreach ($variantsByProduct as $pid => $vlist) {
         'variants' => array_map(function($v) {
             return [
                 'id'         => $v->id,
-                'price'      => $v->price ? (float) $v->price : null,
+                'price'      => $v->price !== null ? (float) $v->price : null,
                 'stock'      => (int) $v->stock,
-                'attributes' => json_decode($v->attributes, true) ?? [],
+                'attributes' => json_decode($v->attributes ?? '{}', true) ?? [],
             ];
         }, $vlist),
     ];
@@ -227,7 +227,7 @@ document.getElementById('payment-link-btn')?.addEventListener('click', function 
     formData.append('payment_method', 'payment_link');
 
     var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (csrfMeta) formData.append('<?= csrf_token() ?>', csrfMeta.content);
+    if (csrfMeta && window.csrfTokenName) formData.append(window.csrfTokenName, csrfMeta.content);
 
     fetch('<?= base_url('pos/checkout') ?>', {
         method: 'POST',
@@ -325,7 +325,7 @@ function openVariantModal(productId) {
             btn.dataset.attrValue = val;
             btn.addEventListener('click', function() {
                 var grp = this.closest('.attr-group');
-                grp.querySelectorAll('.variant-attr-btn').forEach(function(b) {
+                if (grp) grp.querySelectorAll('.variant-attr-btn').forEach(function(b) {
                     b.classList.remove('!bg-neo-yellow', 'selected');
                 });
                 this.classList.add('!bg-neo-yellow', 'selected');
@@ -346,14 +346,15 @@ function openVariantModal(productId) {
 function updateModalVariantDisplay() {
     var match = findMatchingVariant();
     if (match) {
+        var mStock = match.stock || 0;
         var vPrice = match.price || 0;
         modalVariantInfo.classList.remove('hidden');
-        modalVariantStock.textContent = (match.stock > 0 ? '✅ ' : '❌ ') + match.stock + ' units available';
-        modalVariantStock.className = 'text-sm font-bold ' + (match.stock > 0 ? 'text-green-700' : 'text-red-600');
+        modalVariantStock.textContent = (mStock > 0 ? '✅ ' : '❌ ') + mStock + ' units available';
+        modalVariantStock.className = 'text-sm font-bold ' + (mStock > 0 ? 'text-green-700' : 'text-red-600');
         modalVariantPrice.textContent = vPrice > 0 ? 'Rp ' + vPrice.toLocaleString('id-ID') : '';
-        modalAddCart.disabled = match.stock < 1;
-        modalAddCart.className = match.stock < 1 ? 'neo-btn flex-1 text-sm opacity-50 cursor-not-allowed' : 'neo-btn-green flex-1 text-sm';
-        if (parseInt(modalQty.textContent) > match.stock) modalQty.textContent = match.stock;
+        modalAddCart.disabled = mStock < 1;
+        modalAddCart.className = mStock < 1 ? 'neo-btn flex-1 text-sm opacity-50 cursor-not-allowed' : 'neo-btn-green flex-1 text-sm';
+        if (parseInt(modalQty.textContent) > mStock) modalQty.textContent = mStock;
     } else {
         modalVariantInfo.classList.add('hidden');
         modalAddCart.disabled = false;
@@ -398,7 +399,7 @@ modalQtyDec.addEventListener('click', function() {
 modalQtyInc.addEventListener('click', function() {
     var q = parseInt(modalQty.textContent);
     var match = findMatchingVariant();
-    var max = match ? match.stock : 99;
+    var max = match ? (match.stock || 0) : 99;
     if (q < max) modalQty.textContent = q + 1;
 });
 
@@ -408,7 +409,8 @@ modalAddCart.addEventListener('click', function() {
     if (!match) { alert('Please select all attributes'); return; }
 
     var qty = parseInt(modalQty.textContent);
-    if (qty < 1 || qty > match.stock) { alert('Invalid quantity'); return; }
+    var mStock = match.stock || 0;
+    if (qty < 1 || qty > mStock) { alert('Invalid quantity'); return; }
 
     var formData = new FormData();
     formData.append('product_id', currentModalProductId);
@@ -416,7 +418,7 @@ modalAddCart.addEventListener('click', function() {
     formData.append('quantity', qty);
 
     var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (csrfMeta) formData.append('<?= csrf_token() ?>', csrfMeta.content);
+    if (csrfMeta && window.csrfTokenName) formData.append(window.csrfTokenName, csrfMeta.content);
 
     fetch('<?= base_url('pos/addToCart') ?>', {
         method: 'POST',
@@ -429,7 +431,7 @@ modalAddCart.addEventListener('click', function() {
             closeModal();
             location.reload();
         } else {
-            alert(data.error);
+            alert(data.error || 'Unknown error');
         }
     })
     .catch(function() { alert('An error occurred'); });

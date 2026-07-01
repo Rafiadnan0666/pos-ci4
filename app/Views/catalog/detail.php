@@ -178,10 +178,10 @@
                 </thead>
                 <tbody>
                     <?php foreach ($variants as $v):
-                        $vAttrs = json_decode($v->attributes, true) ?? [];
+                        $vAttrs = json_decode($v->attributes ?? '{}', true) ?? [];
                         $attrParts = [];
                         foreach ($vAttrs as $an => $av) { $attrParts[] = esc($an) . ': ' . esc($av); }
-                        $vPrice = $v->price ? (float) $v->price : (float) $product->price;
+                        $vPrice = $v->price !== null ? (float) $v->price : (float) $product->price;
                     ?>
                     <tr class="border-b-2 border-black">
                         <td class="py-2 px-3 font-bold text-sm"><?= implode(' | ', $attrParts) ?></td>
@@ -501,7 +501,7 @@ function initVariantSelector() {
         if (Object.keys(selected).length < totalAttrs) return null;
 
         for (let v of variants) {
-            const vAttrs = JSON.parse(v.attributes);
+            const vAttrs = JSON.parse(v.attributes) || {};
             let match = true;
             for (let key in selected) {
                 if (vAttrs[key] !== selected[key]) { match = false; break; }
