@@ -12,7 +12,7 @@ class OrderItemModel extends Model
     protected $returnType       = 'object';
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
-    protected $allowedFields    = ['order_id', 'product_id', 'size', 'quantity', 'price', 'subtotal'];
+    protected $allowedFields    = ['order_id', 'product_id', 'size', 'variant_id', 'variant_label', 'quantity', 'price', 'subtotal'];
 
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;

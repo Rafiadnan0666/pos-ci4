@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\ProductModel;
+use App\Models\ProductVariantModel;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Libraries\Midtrans;
@@ -10,10 +11,12 @@ use App\Libraries\Midtrans;
 class Pos extends BaseController
 {
     private ProductModel $productModel;
+    private ProductVariantModel $variantModel;
 
     public function __construct()
     {
         $this->productModel = model('App\Models\ProductModel');
+        $this->variantModel = model('App\Models\ProductVariantModel');
     }
 
     public function login()
@@ -76,24 +79,54 @@ class Pos extends BaseController
         $outOfStock   = $this->productModel->getOutOfStock();
         $cart         = session()->get('pos_cart') ?? [];
 
+        // Load variants for all products
+        $productIds = array_map(fn($p) => $p->id, $products);
+        $variantsByProduct = [];
+        $variantAttrsByProduct = [];
+        if (!empty($productIds)) {
+            $allVariants = $this->variantModel
+                ->whereIn('product_id', $productIds)
+                ->orderBy('sort_order', 'ASC')
+                ->orderBy('id', 'ASC')
+                ->findAll();
+            foreach ($allVariants as $v) {
+                $variantsByProduct[$v->product_id][] = $v;
+                $vAttrs = json_decode($v->attributes, true) ?? [];
+                if (!isset($variantAttrsByProduct[$v->product_id])) {
+                    $variantAttrsByProduct[$v->product_id] = [];
+                }
+                foreach ($vAttrs as $k => $val) {
+                    if (!isset($variantAttrsByProduct[$v->product_id][$k])) {
+                        $variantAttrsByProduct[$v->product_id][$k] = [];
+                    }
+                    if (!in_array($val, $variantAttrsByProduct[$v->product_id][$k])) {
+                        $variantAttrsByProduct[$v->product_id][$k][] = $val;
+                    }
+                }
+            }
+        }
+
         $grouped = [];
         foreach ($products as $product) {
             $grouped[$product->category][] = $product;
         }
 
         return view('pos/dashboard', [
-            'grouped'     => $grouped,
-            'categories'  => $categories,
-            'cart'        => $cart,
-            'lowStock'    => $lowStock,
-            'outOfStock'  => $outOfStock,
-            'selectedCat' => $category,
-            'search'      => $search,
-            'user'        => session()->get('name'),
+            'grouped'              => $grouped,
+            'categories'           => $categories,
+            'cart'                 => $cart,
+            'total'                => $this->calculateCartTotal($cart),
+            'lowStock'             => $lowStock,
+            'outOfStock'           => $outOfStock,
+            'selectedCat'          => $category,
+            'search'               => $search,
+            'user'                 => session()->get('name'),
+            'variantsByProduct'    => $variantsByProduct,
+            'variantAttrsByProduct' => $variantAttrsByProduct,
         ]);
     }
 
-    public function addToCart()
+    public function getVariants()
     {
         if (!$this->request->isAJAX()) {
             return $this->response->setJSON(['success' => false, 'error' => 'Invalid request']);
@@ -106,29 +139,99 @@ class Pos extends BaseController
             return $this->response->setJSON(['success' => false, 'error' => 'Product not found']);
         }
 
-        if ($product->stock < 1) {
+        $variants = $this->variantModel->getByProduct($productId);
+        $distinctAttrs = $this->variantModel->getDistinctAttributes($productId);
+
+        $variantData = [];
+        foreach ($variants as $v) {
+            $variantData[] = [
+                'id'         => $v->id,
+                'sku'        => $v->sku,
+                'price'      => $v->price ? (float) $v->price : null,
+                'stock'      => (int) $v->stock,
+                'image'      => $v->image,
+                'attributes' => json_decode($v->attributes, true) ?? [],
+            ];
+        }
+
+        return $this->response->setJSON([
+            'success'        => true,
+            'product'        => [
+                'id'    => $product->id,
+                'name'  => $product->name,
+                'price' => (float) $product->price,
+                'stock' => (int) $product->stock,
+                'image' => $product->image,
+            ],
+            'variants'       => $variantData,
+            'distinctAttrs'  => $distinctAttrs,
+        ]);
+    }
+
+    public function addToCart()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Invalid request']);
+        }
+
+        $productId = (int) $this->request->getPost('product_id');
+        $variantId = (int) ($this->request->getPost('variant_id') ?? 0);
+        $product   = $this->productModel->find($productId);
+
+        if (!$product) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Product not found']);
+        }
+
+        // Determine stock, price, and cart key
+        $variant     = null;
+        $finalStock  = (int) $product->stock;
+        $finalPrice  = (float) $product->price;
+        $variantLabel = '';
+        $cartKey     = (string) $productId;
+
+        if ($variantId > 0) {
+            $variant = $this->variantModel->find($variantId);
+            if ($variant && $variant->product_id == $productId) {
+                $finalStock = (int) $variant->stock;
+                $finalPrice = $variant->price ? (float) $variant->price : $finalPrice;
+                $vAttrs = json_decode($variant->attributes, true) ?? [];
+                $attrParts = [];
+                foreach ($vAttrs as $k => $v) { $attrParts[] = "$k: $v"; }
+                $variantLabel = implode(', ', $attrParts);
+                $cartKey = $productId . '-v' . $variantId;
+            } else {
+                return $this->response->setJSON(['success' => false, 'error' => 'Variant not found']);
+            }
+        } elseif ($product->stock < 1) {
             return $this->response->setJSON(['success' => false, 'error' => 'Out of stock']);
+        }
+
+        if ($finalStock < 1) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Variant out of stock']);
         }
 
         $cart = session()->get('pos_cart') ?? [];
 
-        if (isset($cart[$productId])) {
-            if ($cart[$productId]['quantity'] >= $product->stock) {
+        if (isset($cart[$cartKey])) {
+            if ($cart[$cartKey]['quantity'] >= $finalStock) {
                 return $this->response->setJSON(['success' => false, 'error' => 'Not enough stock']);
             }
-            $cart[$productId]['quantity']++;
+            $cart[$cartKey]['quantity']++;
         } else {
-            $cart[$productId] = [
-                'product_id' => $product->id,
-                'name'       => $product->name,
-                'price'      => (float) $product->price,
-                'weight'     => (int) $product->weight_grams,
-                'quantity'   => 1,
-                'image'      => $product->image,
-                'stock'      => $product->stock,
-                'size'       => $product->size,
-                'color'      => $product->color,
-                'material'   => $product->material,
+            $cart[$cartKey] = [
+                'cart_key'      => $cartKey,
+                'product_id'    => $product->id,
+                'name'          => $product->name,
+                'price'         => $finalPrice,
+                'weight'        => (int) $product->weight_grams,
+                'quantity'      => 1,
+                'image'         => $variant && $variant->image ? $variant->image : $product->image,
+                'stock'         => $finalStock,
+                'size'          => $product->size,
+                'color'         => $product->color,
+                'material'      => $product->material,
+                'variant_id'    => $variantId > 0 ? $variantId : null,
+                'variant_label' => $variantLabel,
             ];
         }
 
@@ -148,22 +251,30 @@ class Pos extends BaseController
             return $this->response->setJSON(['success' => false, 'error' => 'Invalid request']);
         }
 
-        $productId = (int) $this->request->getPost('product_id');
-        $quantity  = (int) $this->request->getPost('quantity');
-        $cart      = session()->get('pos_cart') ?? [];
+        $cartKey  = $this->request->getPost('cart_key') ?: $this->request->getPost('product_id');
+        $quantity = (int) $this->request->getPost('quantity');
+        $cart     = session()->get('pos_cart') ?? [];
 
-        if (!isset($cart[$productId])) {
+        if (!isset($cart[$cartKey])) {
             return $this->response->setJSON(['success' => false, 'error' => 'Item not in cart']);
         }
 
         if ($quantity < 1) {
-            unset($cart[$productId]);
+            unset($cart[$cartKey]);
         } else {
-            $product = $this->productModel->find($productId);
-            if ($product && $quantity > $product->stock) {
+            $item = $cart[$cartKey];
+            $maxStock = $item['stock'] ?? 0;
+            if ($item['variant_id']) {
+                $variant = $this->variantModel->find($item['variant_id']);
+                if ($variant) $maxStock = $variant->stock;
+            } else {
+                $product = $this->productModel->find($item['product_id']);
+                if ($product) $maxStock = $product->stock;
+            }
+            if ($quantity > $maxStock) {
                 return $this->response->setJSON(['success' => false, 'error' => 'Not enough stock']);
             }
-            $cart[$productId]['quantity'] = $quantity;
+            $cart[$cartKey]['quantity'] = $quantity;
         }
 
         session()->set('pos_cart', $cart);
@@ -182,11 +293,11 @@ class Pos extends BaseController
             return $this->response->setJSON(['success' => false, 'error' => 'Invalid request']);
         }
 
-        $productId = (int) $this->request->getPost('product_id');
-        $cart      = session()->get('pos_cart') ?? [];
+        $cartKey = $this->request->getPost('cart_key') ?: $this->request->getPost('product_id');
+        $cart    = session()->get('pos_cart') ?? [];
 
-        if (isset($cart[$productId])) {
-            unset($cart[$productId]);
+        if (isset($cart[$cartKey])) {
+            unset($cart[$cartKey]);
         }
 
         session()->set('pos_cart', $cart);
@@ -248,14 +359,23 @@ class Pos extends BaseController
 
         foreach ($cart as $item) {
             $orderItemModel->insert([
-                'order_id'   => $orderId,
-                'product_id' => $item['product_id'],
-                'quantity'   => $item['quantity'],
-                'price'      => $item['price'],
-                'subtotal'   => $item['price'] * $item['quantity'],
+                'order_id'      => $orderId,
+                'product_id'    => $item['product_id'],
+                'size'          => $item['size'] ?? null,
+                'variant_id'    => $item['variant_id'] ?? null,
+                'variant_label' => $item['variant_label'] ?? null,
+                'quantity'      => $item['quantity'],
+                'price'         => $item['price'],
+                'subtotal'      => $item['price'] * $item['quantity'],
             ]);
 
-            $this->productModel->decrementStock($item['product_id'], $item['quantity']);
+            if ($item['variant_id']) {
+                $this->variantModel->where('id', $item['variant_id'])
+                    ->set('stock', "stock - {$item['quantity']}", false)
+                    ->update();
+            } else {
+                $this->productModel->decrementStock($item['product_id'], $item['quantity']);
+            }
         }
 
         if ($paymentMethod === 'payment_link') {
@@ -264,10 +384,10 @@ class Pos extends BaseController
             $items = [];
             foreach ($cart as $item) {
                 $items[] = [
-                    'id'       => $item['product_id'],
+                    'id'       => $item['variant_id'] ? $item['product_id'] . '-v' . $item['variant_id'] : (string) $item['product_id'],
                     'price'    => (int) $item['price'],
                     'quantity' => $item['quantity'],
-                    'name'     => $item['name'],
+                    'name'     => $item['variant_label'] ? $item['name'] . ' (' . $item['variant_label'] . ')' : $item['name'],
                 ];
             }
 

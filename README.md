@@ -50,6 +50,7 @@ A full-featured **Point of Sale (POS)** and **E-Commerce** web application built
 
 - **Neo-brutalist styling** throughout: 4px black borders, `box-shadow: 4px 4px 0 0 #000`, uppercase Space Grotesk headings, bold color blocks (`#FFDE4D` yellow, `#06B6D4` cyan, `#F97316` orange)
 - **Cart keys** are `product_id`, `product_id-v{id}` for variant items, or `product_id-size` for size-variant items (composite keys)
+- **POS cart** uses the same cart key format — stored in `session('pos_cart')`
 - **Cart data** stored in `session('buyer_cart')` — cleared after successful order
 - **Stock** is decremented on payment settlement, not on order creation
 - **Features/Specs** stored as JSON in DB, entered as plain text in admin form (one per line for features, `key: value` per line for specs)
@@ -178,6 +179,7 @@ php spark migrate:status
 | `014_AlterProductsAddAdvancedFields` | Brand, dimensions, warranty, video, features, specs, care instructions |
 | `015_CreateProductImagesTable` | Product gallery images |
 | `016_CreateProductVariantsTable` | Multi-attribute product variants with JSON attributes, price override, SKU |
+| `017_AlterOrderItemsAddVariant` | Adds `variant_id` and `variant_label` columns to `order_items` |
 
 ---
 
@@ -337,9 +339,12 @@ Products can have **multi-attribute variants** (e.g., Color + Size combinations 
 
 - **Admin**: `/admin/products/variants/:id` — dynamic form to add/remove/save variant rows. Each row has 3 attribute name fields + 3 attribute value fields (e.g. Color=Red, Size=XL, Material=Cotton), plus price override, stock, SKU, sort order.
 - **Storefront**: interactive attribute selector on product detail page — clicking attribute values (e.g. "Red" then "XL") finds the matching variant and updates price/stock display
-- **Cart**: uses `product_id-v{id}` as cart key, stores `variant_label` (e.g. "Color: Red, Size: XL") for display in cart and checkout
+- **POS Dashboard**: Products with variants show a "VARIANTS" badge; clicking opens a modal with attribute selectors (similar to storefront) — selects matching variant and adds to cart with correct stock/price
+- **Cart** (storefront & POS): uses `product_id-v{id}` as cart key, stores `variant_label` (e.g. "Color: Red, Size: XL") for display in cart and checkout
 - **Variant Stock Check**: cart update respects variant stock (not just base product stock)
 - **Variant Price**: nullable price field — null = use base product price, non-null = price override for that specific combination
+- **Order Persistence**: `variant_id` and `variant_label` saved to `order_items` table on checkout
+- **Stock Decrement**: variant stock decremented on payment settlement (alongside base product stock)
 
 ### Per-Size Stock (Legacy)
 
@@ -369,9 +374,16 @@ Products can also have simple size variants (e.g., S, M, L, XL) each with indepe
 
 Access at `/pos` — simplified POS for walk-in customers.
 
-- Add products to cart with quantity
-- Update / remove items
-- Checkout with cash payment simulation
+- Products displayed in a grid grouped by category with search and category filter
+- **Variant Support**: Products with multi-attribute variants show a "VARIANTS" badge; clicking opens a modal to select attribute values (e.g. Color, Size) and quantity before adding to cart
+- **Simple Products**: Click directly to add to cart with quantity 1
+- Add/update/remove cart items with inline +/- buttons
+- **Variant-aware stock validation**: POS validates against variant stock, not base product stock
+- **Variant-aware pricing**: Uses variant price override when available
+- Checkout with **Cash** (instant settlement) or **QRIS** (Midtrans Snap payment link)
+- Cash payment confirmation dialog before processing
+- Inventory alerts for low stock and out-of-stock items
+- Cart stored in `session('pos_cart')` with cart keys matching the storefront format (`product_id` or `product_id-v{id}`)
 - `location.reload()` on success to reset cart state
 
 ---
@@ -506,7 +518,7 @@ pos-ci4/
 | `product_variants` | id, product_id (FK), sku, price (nullable), stock, image, sort_order, attributes (JSON) | Multi-attribute product variants |
 | `product_reviews` | id, product_id (FK), user_id (FK), rating (1-5), review, reply, replied_at, replied_by (FK), status (approved/pending) | Product reviews |
 | `orders` | id, order_number, buyer_id (FK), payment_status, courier_name, shipping_address, biteship_order_id, tracking_number | Orders |
-| `order_items` | id, order_id (FK), product_id (FK), size, quantity, price, subtotal | Order line items |
+| `order_items` | id, order_id (FK), product_id (FK), size, variant_id, variant_label, quantity, price, subtotal | Order line items |
 
 ---
 

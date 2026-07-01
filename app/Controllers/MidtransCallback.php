@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Models\ProductModel;
+use App\Models\ProductVariantModel;
 use App\Libraries\Midtrans;
 use App\Libraries\Biteship;
 
@@ -13,6 +14,7 @@ class MidtransCallback extends BaseController
     private OrderModel $orderModel;
     private OrderItemModel $orderItemModel;
     private ProductModel $productModel;
+    private ProductVariantModel $variantModel;
     private Midtrans $midtrans;
     private Biteship $biteship;
 
@@ -21,6 +23,7 @@ class MidtransCallback extends BaseController
         $this->orderModel     = model('App\Models\OrderModel');
         $this->orderItemModel = model('App\Models\OrderItemModel');
         $this->productModel   = model('App\Models\ProductModel');
+        $this->variantModel   = model('App\Models\ProductVariantModel');
         $this->midtrans       = new Midtrans();
         $this->biteship       = new Biteship();
     }
@@ -70,6 +73,11 @@ class MidtransCallback extends BaseController
         if (in_array($paymentStatus, ['expire', 'deny'], true) && $oldStatus !== 'settlement') {
             $items = $this->orderItemModel->getByOrderId($order->id);
             foreach ($items as $item) {
+                if (!empty($item->variant_id)) {
+                    $this->variantModel->set('stock', "stock + {$item->quantity}", false)
+                        ->where('id', $item->variant_id)
+                        ->update();
+                }
                 $this->productModel->set('stock', "stock + {$item->quantity}", false)
                     ->where('id', $item->product_id)
                     ->update();
@@ -84,6 +92,11 @@ class MidtransCallback extends BaseController
         $items = $this->orderItemModel->getByOrderId($order->id);
 
         foreach ($items as $item) {
+            if (!empty($item->variant_id)) {
+                $this->variantModel->where('id', $item->variant_id)
+                    ->set('stock', "stock - {$item->quantity}", false)
+                    ->update();
+            }
             $this->productModel->decrementStock($item->product_id, $item->quantity);
         }
 

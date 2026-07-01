@@ -667,6 +667,11 @@ class Admin extends BaseController
         $items = $this->orderItemModel->getByOrderId($order->id);
 
         foreach ($items as $item) {
+            if (!empty($item->variant_id)) {
+                $this->variantModel->where('id', $item->variant_id)
+                    ->set('stock', "stock - {$item->quantity}", false)
+                    ->update();
+            }
             $this->productModel->decrementStock($item->product_id, $item->quantity);
         }
 

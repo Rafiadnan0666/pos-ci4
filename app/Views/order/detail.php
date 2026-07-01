@@ -60,7 +60,7 @@
             <tbody>
                 <?php foreach ($items as $item): ?>
                 <tr class="border-b-2 border-black">
-                    <td class="py-2 font-bold"><?= esc($item->name ?? 'Item') ?><?= !empty($item->size) ? ' <span class="text-xs opacity-60">(' . esc($item->size) . ')</span>' : '' ?></td>
+                    <td class="py-2 font-bold"><?= esc($item->name ?? 'Item') ?><?= !empty($item->variant_label) ? ' <span class="text-xs opacity-60">' . esc($item->variant_label) . '</span>' : (!empty($item->size) ? ' <span class="text-xs opacity-60">(' . esc($item->size) . ')</span>' : '') ?></td>
                     <td class="py-2 text-center"><?= $item->quantity ?></td>
                     <td class="py-2 text-right">Rp <?= number_format($item->price, 0, ',', '.') ?></td>
                     <td class="py-2 text-right font-bold">Rp <?= number_format($item->subtotal, 0, ',', '.') ?></td>

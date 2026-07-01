@@ -3,32 +3,45 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('.product-card').forEach(function (card) {
         card.addEventListener('click', function () {
-            const id = this.dataset.id;
-            addToCart(id);
+            var id = this.dataset.id;
+            var hasVariants = this.dataset.hasVariants === 'true';
+            if (hasVariants) {
+                if (typeof openVariantModal === 'function') {
+                    openVariantModal(id);
+                }
+            } else {
+                addToCart(id, 0);
+            }
         });
     });
 
     document.querySelectorAll('.qty-inc').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            const id = this.dataset.id;
-            updateCartItem(id, 'inc');
+            var key = this.dataset.key;
+            var qtyEl = this.closest('.cart-item').querySelector('.qty');
+            var current = parseInt(qtyEl.textContent);
+            updateCartItem(key, current + 1);
         });
     });
 
     document.querySelectorAll('.qty-dec').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            const id = this.dataset.id;
-            updateCartItem(id, 'dec');
+            var key = this.dataset.key;
+            var qtyEl = this.closest('.cart-item').querySelector('.qty');
+            var current = parseInt(qtyEl.textContent);
+            if (current > 1) {
+                updateCartItem(key, current - 1);
+            }
         });
     });
 
     document.querySelectorAll('.remove-item').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            const id = this.dataset.id;
-            removeCartItem(id);
+            var key = this.dataset.key;
+            removeCartItem(key);
         });
     });
 
@@ -40,14 +53,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(function () { location.reload(); });
     });
 
-    function addToCart(productId) {
+    function addToCart(productId, variantId) {
+        var params = new URLSearchParams();
+        params.append('product_id', productId);
+        params.append('variant_id', variantId);
+
         fetch('/pos/addToCart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: 'product_id=' + productId
+            body: params.toString()
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
@@ -59,31 +76,47 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function updateCartItem(productId, action) {
+    function updateCartItem(cartKey, newQuantity) {
+        if (newQuantity < 1) {
+            removeCartItem(cartKey);
+            return;
+        }
+
+        var params = new URLSearchParams();
+        params.append('cart_key', cartKey);
+        params.append('quantity', newQuantity);
+
         fetch('/pos/updateCart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: 'product_id=' + productId
+            body: params.toString()
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.success) {
                 location.reload();
+            } else {
+                alert(data.error);
             }
         });
     }
 
-    function removeCartItem(productId) {
+    function removeCartItem(cartKey) {
+        if (!confirm('Remove this item?')) return;
+
+        var params = new URLSearchParams();
+        params.append('cart_key', cartKey);
+
         fetch('/pos/removeFromCart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: 'product_id=' + productId
+            body: params.toString()
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {

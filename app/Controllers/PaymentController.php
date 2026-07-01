@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Models\ProductModel;
+use App\Models\ProductVariantModel;
 use App\Libraries\Midtrans;
 use App\Libraries\Biteship;
 
@@ -14,6 +15,7 @@ class PaymentController extends BaseController
     private OrderModel $orderModel;
     private OrderItemModel $orderItemModel;
     private ProductModel $productModel;
+    private ProductVariantModel $variantModel;
     private Biteship $biteship;
 
     public function __construct()
@@ -22,6 +24,7 @@ class PaymentController extends BaseController
         $this->orderModel     = model('App\Models\OrderModel');
         $this->orderItemModel = model('App\Models\OrderItemModel');
         $this->productModel   = model('App\Models\ProductModel');
+        $this->variantModel   = model('App\Models\ProductVariantModel');
         $this->biteship       = new Biteship();
     }
 
@@ -94,6 +97,11 @@ class PaymentController extends BaseController
 
         $items = $this->orderItemModel->getByOrderId($orderId);
         foreach ($items as $item) {
+            if (!empty($item->variant_id)) {
+                $this->variantModel->where('id', $item->variant_id)
+                    ->set('stock', "stock - {$item->quantity}", false)
+                    ->update();
+            }
             $this->productModel->decrementStock($item->product_id, $item->quantity);
         }
 
@@ -215,12 +223,14 @@ class PaymentController extends BaseController
         $midtransItems = [];
         foreach ($cart as $item) {
             $orderItemModel->insert([
-                'order_id'   => $orderId,
-                'product_id' => $item['product_id'],
-                'size'       => $item['size'] ?? null,
-                'quantity'   => $item['quantity'],
-                'price'      => $item['price'],
-                'subtotal'   => $item['price'] * $item['quantity'],
+                'order_id'      => $orderId,
+                'product_id'    => $item['product_id'],
+                'size'          => $item['size'] ?? null,
+                'variant_id'    => $item['variant_id'] ?? null,
+                'variant_label' => $item['variant_label'] ?? null,
+                'quantity'      => $item['quantity'],
+                'price'         => $item['price'],
+                'subtotal'      => $item['price'] * $item['quantity'],
             ]);
 
             $midtransItems[] = [
