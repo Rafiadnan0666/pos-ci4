@@ -740,6 +740,18 @@ For variant products, stock is deducted from `product_variants.stock`, NOT `prod
 
 ---
 
+## Screenshots
+
+| Storefront Catalog | Product Detail | Checkout |
+|-------------------|----------------|----------|
+| ![Catalog](public/screenshots/Screenshot%202026-09-07%20115654.png) | ![Detail](public/screenshots/Screenshot%202026-09-07%20115731.png) | ![Checkout](public/screenshots/Screenshot%202026-09-07%20115738.png) |
+
+| POS Dashboard | POS Variant Modal | Admin Dashboard |
+|--------------|-------------------|-----------------|
+| ![POS](public/screenshots/Screenshot%202026-09-07%20115746.png) | ![Variant Modal](public/screenshots/Screenshot%202026-09-07%20115814.png) | ![Admin](public/screenshots/Screenshot%202026-09-07%20115831.png) |
+
+---
+
 ## License
 
 This project is developed for the Outdoor Gear Store. All rights reserved.
