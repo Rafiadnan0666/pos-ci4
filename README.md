@@ -742,13 +742,36 @@ For variant products, stock is deducted from `product_variants.stock`, NOT `prod
 
 ## Screenshots
 
-| Storefront Catalog | Product Detail | Checkout |
-|-------------------|----------------|----------|
-| ![Catalog](public/screenshots/Screenshot%202026-09-07%20115654.png) | ![Detail](public/screenshots/Screenshot%202026-09-07%20115731.png) | ![Checkout](public/screenshots/Screenshot%202026-09-07%20115738.png) |
-
-| POS Dashboard | POS Variant Modal | Admin Dashboard |
-|--------------|-------------------|-----------------|
-| ![POS](public/screenshots/Screenshot%202026-09-07%20115746.png) | ![Variant Modal](public/screenshots/Screenshot%202026-09-07%20115814.png) | ![Admin](public/screenshots/Screenshot%202026-09-07%20115831.png) |
+<table>
+<tr>
+<td align="center" width="33%">
+<b>Storefront Catalog</b><br>
+<img src="public/screenshots/storefront-catalog.png" alt="Storefront Catalog" width="350">
+</td>
+<td align="center" width="33%">
+<b>Product Detail</b><br>
+<img src="public/screenshots/product-detail.png" alt="Product Detail" width="350">
+</td>
+<td align="center" width="33%">
+<b>Checkout</b><br>
+<img src="public/screenshots/checkout.png" alt="Checkout" width="350">
+</td>
+</tr>
+<tr>
+<td align="center" width="33%">
+<b>POS Dashboard</b><br>
+<img src="public/screenshots/pos-dashboard.png" alt="POS Dashboard" width="350">
+</td>
+<td align="center" width="33%">
+<b>POS Variant Modal</b><br>
+<img src="public/screenshots/pos-variant-modal.png" alt="POS Variant Modal" width="350">
+</td>
+<td align="center" width="33%">
+<b>Admin Dashboard</b><br>
+<img src="public/screenshots/admin-dashboard.png" alt="Admin Dashboard" width="350">
+</td>
+</tr>
+</table>
 
 ---
 
