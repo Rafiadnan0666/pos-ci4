@@ -1,0 +1,139 @@
+name: CI/CD - POS CI4
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: pos_ci4_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      CI_ENVIRONMENT: testing
+      app.baseURL: 'http://localhost:8080/'
+      database.default.hostname: 127.0.0.1
+      database.default.database: pos_ci4_test
+      database.default.username: root
+      database.default.password: root
+      database.default.DBDriver: MySQLi
+      database.default.port: 3306
+      MIDTRANS_CLIENT_KEY: SB-Mid-client-test
+      MIDTRANS_SERVER_KEY: SB-Mid-server-test
+      MIDTRANS_IS_PRODUCTION: 'false'
+      BITESHIP_API_KEY: biteship_test.test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, json, mysqlnd, curl, gd
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --no-suggest
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php spark key:generate
+
+      - name: Run migrations
+        run: php spark migrate --all
+
+      - name: Seed database
+        run: php spark db:seed ProductSeeder
+
+      - name: Create upload directories
+        run: |
+          mkdir -p public/uploads/products
+          mkdir -p public/uploads/avatars
+
+      - name: Run PHPUnit tests
+        run: php vendor/bin/phpunit --colors=always
+
+      - name: Run order anomaly check
+        run: |
+          echo "=== Order Anomaly Check ==="
+          php -r "
+          require 'vendor/autoload.php';
+          \$db = \Config\Database::connect();
+          \$orders = \$db->table('orders')->get()->getResult();
+          \$anomalies = [];
+          foreach (\$orders as \$o) {
+            if (\$o->payment_status === 'pending' && strtotime(\$o->created_at) < strtotime('-1 hour')) {
+              \$anomalies[] = 'Order ' . \$o->order_number . ' stuck in pending > 1 hour';
+            }
+            if (\$o->gross_amount < 0) {
+              \$anomalies[] = 'Order ' . \$o->order_number . ' has negative gross_amount';
+            }
+            if (\$o->payment_status === 'settlement' && \$o->midtrans_snap_token && !\$o->biteship_order_id) {
+              \$anomalies[] = 'Order ' . \$o->order_number . ' settled but no shipment created';
+            }
+          }
+          if (count(\$anomalies) > 0) {
+            echo 'ORDER ANOMALIES FOUND:' . PHP_EOL;
+            foreach (\$anomalies as \$a) { echo '  - ' . \$a . PHP_EOL; }
+            exit(1);
+          }
+          echo 'No order anomalies detected.';
+          "
+
+      - name: Run stock integrity check
+        run: |
+          echo "=== Stock Integrity Check ==="
+          php -r "
+          require 'vendor/autoload.php';
+          \$db = \Config\Database::connect();
+          \$variants = \$db->table('product_variants')->get()->getResult();
+          \$anomalies = [];
+          foreach (\$variants as \$v) {
+            if (\$v->stock < 0) {
+              \$anomalies[] = 'Variant ' . \$v->id . ' (' . \$v->name . ') has negative stock: ' . \$v->stock;
+            }
+          }
+          \$products = \$db->table('products')->get()->getResult();
+          foreach (\$products as \$p) {
+            if (\$p->stock < 0) {
+              \$anomalies[] = 'Product ' . \$p->id . ' (' . \$p->name . ') has negative stock: ' . \$p->stock;
+            }
+          }
+          if (count(\$anomalies) > 0) {
+            echo 'STOCK ANOMALIES FOUND:' . PHP_EOL;
+            foreach (\$anomalies as \$a) { echo '  - ' . \$a . PHP_EOL; }
+            exit(1);
+          }
+          echo 'No stock anomalies detected.';
+          "
+
+      - name: Report results
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "  CI/CD REPORT - POS CI4"
+          echo "=========================================="
+          echo "  PHPUnit:   PASS"
+          echo "  Orders:    PASS (no anomalies)"
+          echo "  Stock:     PASS (no anomalies)"
+          echo "=========================================="

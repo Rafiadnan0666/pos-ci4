@@ -723,6 +723,23 @@ For variant products, stock is deducted from `product_variants.stock`, NOT `prod
 
 ---
 
+## Known Limitations
+
+| Limitation | Impact | Workaround |
+|------------|--------|------------|
+| **No JWT/API tokens** | Session-based auth only; no headless API access | Add API token middleware for mobile apps |
+| **No pagination on admin lists** | Large datasets may cause slow page loads | Add pagination to Admin controllers |
+| **Single currency (IDR)** | Hardcoded Indonesian Rupiah formatting | Abstract currency service for multi-currency |
+| **No automated testing for payments** | Midtrans/Biteship integration tested manually | Add mock adapters for CI testing |
+| **Variant limit: 3 attributes** | Max Color + Size + Material combinations | Modify JSON schema for more attributes |
+| **No order modification after settlement** | Settled orders are immutable | Admin manual adjustment workflow |
+| **No inventory reservations** | Stock only decrements on settlement | Add reservation logic for high-demand items |
+| **Tailwind via CDN** | Larger initial load; no tree-shaking | Compile to static CSS for production |
+| **No rate limiting** | Public endpoints vulnerable to abuse | Add rate limiter middleware |
+| **Single warehouse** | No multi-location inventory support | Extend `product_variants` with location_id |
+
+---
+
 ## License
 
 This project is developed for the Outdoor Gear Store. All rights reserved.
