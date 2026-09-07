@@ -57,6 +57,15 @@ jobs:
       - name: Prepare environment
         run: |
           cp .env.example .env
+          php -r "
+          define('FCPATH', __DIR__ . '/public/');
+          define('APPPATH', __DIR__ . '/app/');
+          define('ROOTPATH', __DIR__ . '/');
+          define('WRITEPATH', __DIR__ . '/writable/');
+          define('TESTPATH', __DIR__ . '/tests/');
+          require 'vendor/autoload.php';
+          \$app = require 'app/Config/Boot/production.php';
+          " 2>/dev/null || true
           php spark key:generate
 
       - name: Run migrations
